@@ -1,0 +1,17 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install uv
+RUN uv venv .venv
+RUN uv pip install --no-cache-dir -r requirements.txt
+
+COPY master/ ./master/
+COPY api/ ./api/
+COPY shared/ ./shared/
+COPY start_grpc_server.py .
+
+EXPOSE 50052
+
+CMD uv run python start_grpc_server.py

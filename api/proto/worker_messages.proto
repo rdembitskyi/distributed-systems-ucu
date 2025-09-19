@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package secondary_worker;
+
+// gRPC Services
+service SecondaryWorkerService {
+  // Replicate a message from master to secondary worker
+  rpc ReplicateMessage(MasterMessageReplicaRequest) returns (MasterMessageReplicaResponse);
+
+  // Health check endpoint
+  rpc ReportHealth(MasterHealthCheckRequest) returns (MasterHealthCheckResponse);
+
+  // Get all messages stored in this worker
+  rpc GetMessages(GetMessagesRequest) returns (GetMessagesResponse);
+}
+
+// MessageReceived extends Message
+message MessageReplicaReceived {
+  string message_id = 1;
+  string content = 2;
+  int32 sequence_number = 3;
+  string parent_id = 4;
+  double timestamp = 5;
+  string signature = 6;
+  string status = 7;
+}
+
+// Master Message Request
+message MasterMessageReplicaRequest {
+  MessageReplicaReceived message = 1;
+  string auth_token = 2;
+}
+
+// Master Message Response
+message MasterMessageReplicaResponse {
+  string status = 1;
+  int32 status_code = 2;
+  optional string error_message = 3;
+}
+
+// Master Health Check Request
+message MasterHealthCheckRequest {
+  string auth_token = 1;
+}
+
+// Master Health Check Response
+message MasterHealthCheckResponse {
+  string status = 1;
+}
+
+// Get Messages Request (empty for now)
+message GetMessagesRequest {
+}
+
+// Get Messages Response
+message GetMessagesResponse {
+  repeated MessageReplicaReceived messages = 1;
+}

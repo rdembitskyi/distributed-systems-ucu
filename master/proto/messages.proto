@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package messages;
+
+// Message service definition
+service MessageService {
+  // Post a new message
+  rpc PostMessage (PostMessageRequest) returns (PostMessageResponse);
+
+  // Get all messages
+  rpc GetMessages (GetMessagesRequest) returns (GetMessagesResponse);
+}
+
+message PostMessageRequest {
+  string content = 1;
+}
+
+// Message data structure
+message Message {
+  string message_id = 1;    // UUID
+  string content = 2;
+  int32 sequence_number = 3;
+  string parent_id = 4;
+  double timestamp = 5;
+}
+
+// Response message for posting a message
+message PostMessageResponse {
+  string status = 1;
+  string message = 2;
+  int32 total_messages = 3;
+}
+
+// Request message for getting messages (empty for now)
+message GetMessagesRequest {
+}
+
+// Response message for getting messages
+message GetMessagesResponse {
+  repeated Message messages = 1;
+}

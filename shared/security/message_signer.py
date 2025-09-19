@@ -1,0 +1,56 @@
+import json
+import base64
+from cryptography.fernet import Fernet
+from shared.domain.messages import Message
+import os
+
+
+class FernetMessageSigner:
+    def __init__(self):
+        # Get key from environment or generate one
+        key = os.getenv("FERNET_KEY")
+        if not key:
+            raise ValueError("FERNET_KEY environment variable is not set")
+        else:
+            key = key.encode()
+
+        self.fernet = Fernet(key)
+
+    def sign_message(self, message: Message) -> str:
+        """Sign message content, sequence_number, id, parent_id"""
+        # Create payload to sign
+        payload = {
+            "message_id": message.message_id,
+            "content": message.content,
+            "sequence_number": message.sequence_number,
+            "parent_id": message.parent_id,
+        }
+
+        # Convert to JSON and encrypt
+        payload_json = json.dumps(payload, sort_keys=True)
+        signature = self.fernet.encrypt(payload_json.encode())
+
+        return base64.b64encode(signature).decode()
+
+    def verify_signature(self, message: Message, signature: str) -> bool:
+        """Verify message signature on replica"""
+        try:
+            payload = {
+                "message_id": message.message_id,
+                "content": message.content,
+                "sequence_number": message.sequence_number,
+                "parent_id": message.parent_id,
+            }
+
+            expected_json = json.dumps(payload, sort_keys=True)
+
+            # Decode and decrypt signature
+            signature_bytes = base64.b64decode(signature.encode())
+            decrypted_payload = self.fernet.decrypt(signature_bytes)
+
+            # Compare payloads
+            return decrypted_payload.decode() == expected_json
+
+        except Exception as e:
+            print(f"Signature verification failed: {e}")
+            return False

@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  master:
+    build:
+      context: .
+      dockerfile: Dockerfile.master
+    ports:
+      - "50052:50052"
+    networks:
+      - grpc-network
+    environment:
+      - PYTHONPATH=/app
+      - AUTH_TOKEN=master-token
+      - FERNET_KEY=qkCoYgy9Whld8wg3GWstir9QN2Jy1HUrZSNZjnrEf4U= # i know this is not secure
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+  worker1:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+      args:
+        - PORT=50053
+    ports:
+      - "50053:50053"
+    networks:
+      - grpc-network
+    environment:
+      - PYTHONPATH=/app
+      - PORT=50053
+      - AUTH_TOKEN=master-token
+      - MACHINE_ID=1234
+      - FERNET_KEY=qkCoYgy9Whld8wg3GWstir9QN2Jy1HUrZSNZjnrEf4U= # i know this is not secure
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+  worker2:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+      args:
+        - PORT=50054
+    ports:
+      - "50054:50054"
+    networks:
+      - grpc-network
+    environment:
+      - PYTHONPATH=/app
+      - PORT=50054
+      - AUTH_TOKEN=master-token
+      - MACHINE_ID=5678
+      - FERNET_KEY=qkCoYgy9Whld8wg3GWstir9QN2Jy1HUrZSNZjnrEf4U= # i know this is not secure
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+networks:
+  grpc-network:
+    driver: bridge
+
+volumes:
+  logs:
