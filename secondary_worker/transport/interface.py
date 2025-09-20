@@ -15,7 +15,7 @@ class SecondaryTransportInterface(ABC):
         pass
 
     @abstractmethod
-    async def replicate_message(self, message: Message):
+    async def replicate_message(self, message: Message, master_token: str):
         """Replicate a message from the master"""
         pass
 

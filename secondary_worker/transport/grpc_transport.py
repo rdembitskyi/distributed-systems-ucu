@@ -9,6 +9,7 @@ from secondary_worker.domain.messages import (
     MasterHealthCheckResponse,
 )
 from shared.security.auth import validate_auth_token
+from secondary_worker.services.replica_message_validation.replica_validation import validate_message
 
 from shared.storage.factory import get_messages_storage
 
@@ -24,13 +25,25 @@ class GrpcTransport(SecondaryTransportInterface):
 
     async def get_messages(self) -> list[str]:
         """Return all messages from the in-memory list"""
-        messages = list(self._store.messages.copy().values())
-        return messages
+        return self._store.get_messages()
 
-    async def replicate_message(self, message: Message) -> MasterMessageReplicaResponse:
+    async def replicate_message(self, message: Message, master_token: str) -> MasterMessageReplicaResponse:
         """Receive a message from the master"""
         logger.info(f"Replica: Received message: {message}")
-        await asyncio.sleep(5.0)  # Delay for testing
+
+        if not validate_auth_token(token=master_token):
+            logger.error("Replica: Invalid auth token from master")
+            return MasterMessageReplicaResponse(status="error", status_code=403, error_message="Invalid auth token")
+
+        validation_result = validate_message(message=message)
+        if not validation_result.is_valid:
+            logger.error(f"Replica: Message validation failed: {message} with error: {validation_result.error}")
+            return MasterMessageReplicaResponse(status="error", status_code=400, error_message=validation_result.error)
+        if validation_result.is_duplicated:
+            logger.error(f"Replica: Duplicated message received: {message}")
+            return MasterMessageReplicaResponse(status="error", status_code=409, error_message="Duplicated message")
+
+        await asyncio.sleep(2.0)  # Delay for testing
         result = self._store.add_message(message)
 
         if not result:
@@ -102,14 +115,8 @@ class GrpcSecondaryServicer(worker_messages_pb2_grpc.SecondaryWorkerServiceServi
         )
         master_token = request.auth_token
 
-        if not validate_auth_token(token=master_token):
-            logger.error("Replica: Invalid auth token from master")
-            return worker_messages_pb2.MasterMessageReplicaResponse(
-                status="error", status_code=403, error_message="Invalid auth token"
-            )
-
         # Process the message
-        await self.transport.replicate_message(message)
+        await self.transport.replicate_message(message=message, master_token=master_token)
 
         # Return response
         return worker_messages_pb2.MasterMessageReplicaResponse(status="success", status_code=200, error_message=None)

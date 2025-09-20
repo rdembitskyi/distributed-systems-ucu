@@ -87,7 +87,7 @@ class MessageStore(MessageStoreInterface):
         """Get message by sequence number - O(1)"""
         return self.messages.get(seq)
 
-    def get_by_id(self, msg_id: str) -> Optional[Dict]:
+    def get_by_id(self, msg_id: str) -> Optional[Message]:
         """Get message by ID - O(1)"""
         seq = self.id_to_sequence.get(msg_id)
         return self.messages.get(seq) if seq is not None else None

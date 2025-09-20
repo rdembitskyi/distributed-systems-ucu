@@ -37,6 +37,7 @@ class GrpcTransport(MasterTransportInterface):
             logger.error(f"Failed to replicate message to all workers: {replication.error_message}")
             return {"status": "error", "message": "Failed to replicate message to all workers"}
         else:
+            # add message to the store per requirement that we receive ACK from all workers
             self._store.add_message(message=message)
 
         return {
@@ -47,7 +48,7 @@ class GrpcTransport(MasterTransportInterface):
 
     async def get_messages(self) -> list[Message]:
         """Return all messages from the in-memory list"""
-        return self._store.messages.copy().values()
+        return self._store.get_messages()
 
     async def start_server(self, port: int = 50051):
         """Start the async gRPC server"""
@@ -77,7 +78,7 @@ class GrpcMessageServicer(messages_pb2_grpc.MessageServiceServicer):
         logger.info(f"Received POST message request: {request}")
         content = request.content
 
-        result = await self.transport.post_message(content)
+        result = await self.transport.save_message(content)
         logger.info(f"Result of POST message request: {result}")
         return messages_pb2.PostMessageResponse(
             status=result["status"],

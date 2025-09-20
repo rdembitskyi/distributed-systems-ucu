@@ -53,8 +53,6 @@ async def main():
 
     args = parser.parse_args()
 
-    print(1111111)
-    print(int(args.port))
     worker_server = WorkerServer(int(args.port))
 
     # Handle graceful shutdown

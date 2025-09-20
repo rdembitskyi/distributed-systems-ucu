@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from shared.domain.messages import Message, MessageStatus
 from shared.storage.interface import MessageStoreInterface
+from shared.security.message_signer import FernetMessageSigner
 
 
 logger = logging.getLogger(__name__)
@@ -18,6 +19,7 @@ class MessageBuilder:
 
     def __init__(self, store: MessageStoreInterface):
         self.store = store
+        self.signer = FernetMessageSigner()
 
     def create_message(self, content: str) -> Message | None:
         """
@@ -32,7 +34,10 @@ class MessageBuilder:
             return None
 
         try:
-            message = self._build_message(content)
+            message = self._build_message(content=content)
+
+            self.signer.sign_message(message=message)
+            print(1111111, message.signature)
 
             if message.sequence_number in self.store.get_messages_ids():
                 return None
