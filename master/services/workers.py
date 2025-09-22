@@ -7,6 +7,8 @@ from grpc import aio
 from shared.domain.messages import Message
 from api.generated import worker_messages_pb2, worker_messages_pb2_grpc
 from shared.security.auth import get_auth_token
+from secondary_worker.domain.messages import MasterMessageReplicaResponse
+from master.services.replication_coordinator import handle_replication_response_from_workers
 
 logger = logging.getLogger(__name__)
 WORKERS_REGISTRY = [
@@ -63,19 +65,11 @@ class WorkersService:
             )
 
             # Check if all replications succeeded
-            failed_workers = []
-            for i, result in enumerate(results):
-                worker_id = list(active_workers.keys())[i]
-                if isinstance(result, Exception) or not result:
-                    failed_workers.append(worker_id)
-                    logger.error(f"Replication failed for worker {worker_id}: {result}")
-
-            if failed_workers:
-                return ReplicationResult(
-                    success=False,
-                    failed_workers=failed_workers,
-                    error_message=f"Replication failed for workers: {failed_workers}",
-                )
+            replication_statuses = handle_replication_response_from_workers(
+                active_workers=active_workers, results=results
+            )
+            if not replication_statuses.success:
+                return ReplicationResult(success=False, error_message=replication_statuses.error_message)
 
             logger.info(f"Successfully replicated message {message.message_id} to all workers")
             return ReplicationResult(success=True)
@@ -89,39 +83,32 @@ class WorkersService:
             logger.error(f"Unexpected error during replication: {e}")
             return ReplicationResult(success=False, error_message=f"Unexpected error: {str(e)}")
 
-    async def replicate_to_worker(self, worker_id: str, message: Message) -> bool:
+    async def replicate_to_worker(self, worker_id: str, message: Message) -> MasterMessageReplicaResponse:
         """Replicate message to a single worker"""
-        try:
-            client = self.worker_clients[worker_id]
+        client = self.worker_clients[worker_id]
 
-            # Create protobuf request
-            pb_message = worker_messages_pb2.MessageReplicaReceived(
-                message_id=message.message_id,
-                content=message.content,
-                sequence_number=message.sequence_number,
-                parent_id=message.parent_id,
-                timestamp=message.timestamp,
-                signature=message.signature or "",
-                status=message.status.value,
-            )
+        # Create protobuf request
+        pb_message = worker_messages_pb2.MessageReplicaReceived(
+            message_id=message.message_id,
+            content=message.content,
+            sequence_number=message.sequence_number,
+            parent_id=message.parent_id,
+            timestamp=message.timestamp,
+            signature=message.signature,
+            status=message.status.value,
+        )
 
-            auth_token = get_auth_token()
+        auth_token = get_auth_token()
 
-            request = worker_messages_pb2.MasterMessageReplicaRequest(message=pb_message, auth_token=auth_token)
+        request = worker_messages_pb2.MasterMessageReplicaRequest(message=pb_message, auth_token=auth_token)
 
-            # Send replication request
-            response = await client.ReplicateMessage(request)
-
-            if response.status == "success":
-                logger.debug(f"Worker {worker_id} acknowledged message {message.message_id}")
-                return True
-            else:
-                logger.error(f"Worker {worker_id} rejected message {message.message_id}: {response.error_message}")
-                return False
-
-        except Exception as e:
-            logger.error(f"Failed to replicate to worker {worker_id}: {e}")
-            return False
+        # Send replication request
+        result = await client.ReplicateMessage(request)
+        return MasterMessageReplicaResponse(
+            status=result.status,
+            status_code=result.status_code,
+            error_message=result.error_message,
+        )
 
     def get_active_workers(self) -> List[Worker]:
         """Get list of active workers"""

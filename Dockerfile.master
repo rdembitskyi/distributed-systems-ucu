@@ -8,6 +8,7 @@ RUN uv venv .venv
 RUN uv pip install --no-cache-dir -r requirements.txt
 
 COPY master/ ./master/
+COPY secondary_worker/ ./secondary_worker/
 COPY api/ ./api/
 COPY shared/ ./shared/
 COPY start_grpc_server.py .

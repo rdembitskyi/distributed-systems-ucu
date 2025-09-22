@@ -2,8 +2,7 @@ import asyncio
 import grpc
 
 # Import the gRPC generated stubs
-from master.generated import messages_pb2
-from master.generated import messages_pb2_grpc
+from api.generated import messages_pb2, messages_pb2_grpc
 
 SERVER_ADDRESS = "localhost:50052"
 

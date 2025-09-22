@@ -7,4 +7,5 @@ class ReplicationResult:
 
     success: bool
     failed_workers: list[str] | None = None
+    retry_workers: list[str] | None = None
     error_message: str | None = None

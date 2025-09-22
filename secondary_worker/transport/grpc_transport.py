@@ -9,6 +9,7 @@ from secondary_worker.domain.messages import (
     MasterHealthCheckResponse,
 )
 from shared.security.auth import validate_auth_token
+from shared.domain.status_codes import StatusCodes
 from secondary_worker.services.replica_message_validation.replica_validation import validate_message
 
 from shared.storage.factory import get_messages_storage
@@ -33,15 +34,21 @@ class GrpcTransport(SecondaryTransportInterface):
 
         if not validate_auth_token(token=master_token):
             logger.error("Replica: Invalid auth token from master")
-            return MasterMessageReplicaResponse(status="error", status_code=403, error_message="Invalid auth token")
+            return MasterMessageReplicaResponse(
+                status="error", status_code=StatusCodes.UNAUTHORIZED.value, error_message="Invalid auth token"
+            )
 
         validation_result = validate_message(message=message)
         if not validation_result.is_valid:
             logger.error(f"Replica: Message validation failed: {message} with error: {validation_result.error}")
-            return MasterMessageReplicaResponse(status="error", status_code=400, error_message=validation_result.error)
+            return MasterMessageReplicaResponse(
+                status="error", status_code=StatusCodes.BAD_REQUEST.value, error_message=validation_result.error
+            )
         if validation_result.is_duplicated:
             logger.error(f"Replica: Duplicated message received: {message}")
-            return MasterMessageReplicaResponse(status="error", status_code=409, error_message="Duplicated message")
+            return MasterMessageReplicaResponse(
+                status="error", status_code=StatusCodes.DUPLICATE_RECEIVED.value, error_message="Duplicated message"
+            )
 
         await asyncio.sleep(2.0)  # Delay for testing
         result = self._store.add_message(message)
@@ -49,9 +56,11 @@ class GrpcTransport(SecondaryTransportInterface):
         if not result:
             logger.error("Replica: Failed to add message to the store")
             return MasterMessageReplicaResponse(
-                status="error", status_code=500, error_message="Failed to add message to the store"
+                status="error",
+                status_code=StatusCodes.INTERNAL_SERVER_ERROR.value,
+                error_message="Failed to add message to the store",
             )
-        return MasterMessageReplicaResponse(status="success", status_code=200, error_message=None)
+        return MasterMessageReplicaResponse(status="success", status_code=StatusCodes.OK.value, error_message=None)
 
     async def report_health(self) -> MasterHealthCheckResponse:
         """Report health status to master"""
@@ -116,10 +125,12 @@ class GrpcSecondaryServicer(worker_messages_pb2_grpc.SecondaryWorkerServiceServi
         master_token = request.auth_token
 
         # Process the message
-        await self.transport.replicate_message(message=message, master_token=master_token)
+        result = await self.transport.replicate_message(message=message, master_token=master_token)
 
         # Return response
-        return worker_messages_pb2.MasterMessageReplicaResponse(status="success", status_code=200, error_message=None)
+        return worker_messages_pb2.MasterMessageReplicaResponse(
+            status=result.status, status_code=result.status_code, error_message=result.error_message
+        )
 
     async def ReportHealth(self, request, context):
         """Handle health check requests from master"""

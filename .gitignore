@@ -152,11 +152,6 @@ Thumbs.db
 logs/
 *.log
 
-# Generated protobuf files
-**/generated/
-**/*_pb2.py
-**/*_pb2_grpc.py
-
 # Project specific
 # Uncomment if you want to ignore specific files
 # config/local.json

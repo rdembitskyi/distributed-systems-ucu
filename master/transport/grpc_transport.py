@@ -2,8 +2,7 @@ import logging
 from grpc import aio
 from typing import Any
 from master.transport.interface import MasterTransportInterface
-from master.generated import messages_pb2
-from master.generated import messages_pb2_grpc
+from api.generated import messages_pb2, messages_pb2_grpc
 from shared.domain.messages import Message
 from shared.storage.factory import get_messages_storage
 from shared.services.message_bulder import MessageBuilder
