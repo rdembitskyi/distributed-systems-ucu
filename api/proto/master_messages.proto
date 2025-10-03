@@ -11,11 +11,13 @@ service MessageService {
   rpc GetMessages (GetMessagesRequest) returns (GetMessagesResponse);
 }
 
+// Request message for posting a new message from a client
 message PostMessageRequest {
   string content = 1;
+  int32 write_concern = 2; // Number of replicas required to acknowledge the write
 }
 
-// Message data structure
+// Message data structure. Used for replication and storage.
 message Message {
   string message_id = 1;    // UUID
   string content = 2;

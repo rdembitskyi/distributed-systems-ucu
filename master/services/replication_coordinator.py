@@ -25,7 +25,7 @@ def handle_replication_response_from_workers(active_workers, results: list[Maste
             error_str = f"Unexpected error: Replication failed for worker {worker_id}: {result}"
             logger.error(error_messages)
             error_messages.append(error_str)
-        if result.status_code == StatusCodes.UNAUTHORIZED.value:
+        elif result.status_code == StatusCodes.UNAUTHORIZED.value:
             failed_workers.append(worker_id)
             error_str = f"Replication failed for worker {worker_id}: Unauthorized"
             logger.error(error_str)

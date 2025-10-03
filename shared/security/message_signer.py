@@ -51,11 +51,11 @@ class FernetMessageSigner:
             expected_json = json.dumps(payload, sort_keys=True)
 
             # Decode and decrypt signature
-            signature_bytes = base64.b64decode(signature.encode())
-            decrypted_payload = self.fernet.decrypt(signature_bytes)
+            decrypted_payload = self.fernet.decrypt(signature.encode())
 
             # Compare payloads
-            return decrypted_payload.decode() == expected_json
+            is_valid = decrypted_payload.decode() == expected_json
+            return is_valid
 
         except Exception as e:
             logger.error(f"Error verifying signature: {e}")

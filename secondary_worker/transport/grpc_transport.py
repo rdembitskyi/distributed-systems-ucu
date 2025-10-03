@@ -50,7 +50,7 @@ class GrpcTransport(SecondaryTransportInterface):
                 status="error", status_code=StatusCodes.DUPLICATE_RECEIVED.value, error_message="Duplicated message"
             )
 
-        await asyncio.sleep(2.0)  # Delay for testing
+        await asyncio.sleep(5.0)  # Delay for testing
         result = self._store.add_message(message)
 
         if not result:

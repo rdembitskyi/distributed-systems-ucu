@@ -2,7 +2,7 @@ import logging
 from grpc import aio
 from typing import Any
 from master.transport.interface import MasterTransportInterface
-from api.generated import messages_pb2, messages_pb2_grpc
+from api.generated import master_messages_pb2, master_messages_pb2_grpc
 from shared.domain.messages import Message
 from shared.storage.factory import get_messages_storage
 from shared.services.message_bulder import MessageBuilder
@@ -20,8 +20,11 @@ class GrpcTransport(MasterTransportInterface):
         self.builder = MessageBuilder(store=self._store)
         self.workers_service = WorkersService()
 
-    async def save_message(self, message_content: str) -> dict[str, Any]:
-        """Append a message to the in-memory list"""
+    async def save_message(self, message_content: str, write_concern=3) -> dict[str, Any]:
+        """Append a message to the in-memory list.
+        By default we set write concern to 3 to ensure that the message is replicated to all workers.
+        But user can override this by passing write_concern as a parameter in request
+        """
         message = self.builder.create_message(content=message_content)
 
         if not message:
@@ -31,13 +34,16 @@ class GrpcTransport(MasterTransportInterface):
                 "total_messages": len(self._store.get_messages()),
             }
 
-        replication = await self.workers_service.replicate_message_to_all(message=message)
+        self._store.add_message(message=message)
+        replication = await self.workers_service.replicate_message_to_workers(
+            message=message, write_concern=write_concern
+        )
         if not replication.success:
-            logger.error(f"Failed to replicate message to all workers: {replication.error_message}")
-            return {"status": "error", "message": "Failed to replicate message to all workers"}
-        else:
-            # add message to the store per requirement that we receive ACK from all workers
-            self._store.add_message(message=message)
+            logger.error(f"Failed to replicate message to {write_concern - 1} workers: {replication.error_message}")
+            return {
+                "status": "error",
+                "message": f"Failed to replicate message to {write_concern - 1} workers: {replication.error_message}",
+            }
 
         return {
             "status": "success",
@@ -53,7 +59,7 @@ class GrpcTransport(MasterTransportInterface):
         """Start the async gRPC server"""
         self._server = aio.server()
         servicer = GrpcMessageServicer(self)
-        messages_pb2_grpc.add_MessageServiceServicer_to_server(servicer, self._server)
+        master_messages_pb2_grpc.add_MessageServiceServicer_to_server(servicer, self._server)
         self._server.add_insecure_port(f"[::]:{port}")
         await self._server.start()
         logger.info(f"gRPC server started on port {port}")
@@ -66,7 +72,7 @@ class GrpcTransport(MasterTransportInterface):
             logger.info("gRPC server stopped")
 
 
-class GrpcMessageServicer(messages_pb2_grpc.MessageServiceServicer):
+class GrpcMessageServicer(master_messages_pb2_grpc.MessageServiceServicer):
     """gRPC servicer implementation"""
 
     def __init__(self, transport: GrpcTransport):
@@ -76,10 +82,11 @@ class GrpcMessageServicer(messages_pb2_grpc.MessageServiceServicer):
         """Handle POST message requests"""
         logger.info(f"Received POST message request: {request}")
         content = request.content
+        write_concern = request.write_concern
 
-        result = await self.transport.save_message(content)
+        result = await self.transport.save_message(message_content=content, write_concern=write_concern)
         logger.info(f"Result of POST message request: {result}")
-        return messages_pb2.PostMessageResponse(
+        return master_messages_pb2.PostMessageResponse(
             status=result["status"],
             message=result["message"],
         )
@@ -92,7 +99,7 @@ class GrpcMessageServicer(messages_pb2_grpc.MessageServiceServicer):
         # Convert domain messages to protobuf messages
         pb_messages = []
         for msg in domain_messages:
-            pb_msg = messages_pb2.Message(
+            pb_msg = master_messages_pb2.Message(
                 message_id=msg.message_id,
                 content=msg.content,
                 sequence_number=msg.sequence_number,
@@ -101,4 +108,4 @@ class GrpcMessageServicer(messages_pb2_grpc.MessageServiceServicer):
             )
             pb_messages.append(pb_msg)
         logger.info(f"Result of GET messages request: {pb_messages}")
-        return messages_pb2.GetMessagesResponse(messages=pb_messages)
+        return master_messages_pb2.GetMessagesResponse(messages=pb_messages)

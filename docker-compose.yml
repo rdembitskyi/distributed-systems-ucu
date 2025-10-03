@@ -15,6 +15,12 @@ services:
       - FERNET_KEY=qkCoYgy9Whld8wg3GWstir9QN2Jy1HUrZSNZjnrEf4U= # i know this is not secure
     volumes:
       - ./logs:/app/logs
+      - ./master:/app/master
+      - ./secondary_worker:/app/secondary_worker
+      - ./api:/app/api
+      - ./shared:/app/shared
+      - ./start_grpc_server.py:/app/start_grpc_server.py
+    command: sh -c "uv run watchmedo auto-restart --directory=/app --patterns='*.py' --recursive --debug-force-polling -- python start_grpc_server.py"
     restart: unless-stopped
 
   worker1:

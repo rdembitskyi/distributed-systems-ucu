@@ -44,7 +44,7 @@ class MessageStore(MessageStoreInterface):
     def add_message(self, message: Message) -> bool:
         """Add a message - O(1) operation"""
         with self.lock:
-            parent_id = None
+            parent_id = ""
             sequence_number = 1
             if self.latest_message:
                 logger.info(f"Found latest message: {self.latest_message}")

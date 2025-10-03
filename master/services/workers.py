@@ -9,6 +9,7 @@ from api.generated import worker_messages_pb2, worker_messages_pb2_grpc
 from shared.security.auth import get_auth_token
 from secondary_worker.domain.messages import MasterMessageReplicaResponse
 from master.services.replication_coordinator import handle_replication_response_from_workers
+from shared.utils.concurrency import wait_for_quorum, QuorumNotReached
 
 logger = logging.getLogger(__name__)
 WORKERS_REGISTRY = [
@@ -37,10 +38,10 @@ class WorkersService:
 
         logger.info(f"Initialized {len(self.workers)} workers")
 
-    async def replicate_message_to_all(self, message: Message) -> ReplicationResult:
+    async def replicate_message_to_workers(self, message: Message, write_concern: int) -> ReplicationResult:
         """
-        Replicate message to all active workers.
-        Returns success only if ALL workers acknowledge.
+        Replicate message to active workers.
+        Returns success only if quorum of workers acknowledge.
         """
         if not self.workers:
             return ReplicationResult(success=False, error_message="No workers available")
@@ -59,9 +60,10 @@ class WorkersService:
             replication_tasks.append(task)
 
         try:
-            # Wait for all workers to respond within timeout
-            results = await asyncio.wait_for(
-                asyncio.gather(*replication_tasks, return_exceptions=True), timeout=self.replication_timeout
+            # Wait for workers quorum
+            quorum_count = write_concern - 1  # Subtract 1 for the master
+            results = await wait_for_quorum(
+                tasks=replication_tasks, required_count=quorum_count, timeout=self.replication_timeout
             )
 
             # Check if all replications succeeded
@@ -71,7 +73,7 @@ class WorkersService:
             if not replication_statuses.success:
                 return ReplicationResult(success=False, error_message=replication_statuses.error_message)
 
-            logger.info(f"Successfully replicated message {message.message_id} to all workers")
+            logger.info(f"Successfully replicated message {message.message_id} to {quorum_count} workers")
             return ReplicationResult(success=True)
 
         except asyncio.TimeoutError:
@@ -79,6 +81,9 @@ class WorkersService:
             return ReplicationResult(
                 success=False, error_message=f"Replication timeout after {self.replication_timeout}s"
             )
+        except QuorumNotReached:
+            logger.error(f"Replication: Failed to reach quorum of {quorum_count} workers")
+            return ReplicationResult(success=False, error_message=f"Replication failed: Quorum not reached")
         except Exception as e:
             logger.error(f"Unexpected error during replication: {e}")
             return ReplicationResult(success=False, error_message=f"Unexpected error: {str(e)}")
