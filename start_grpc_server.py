@@ -9,7 +9,10 @@ from master.transport.grpc_transport import GrpcTransport
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout), logging.FileHandler("/app/logs/master.log")],
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler("/app/logs/master.log"),
+    ],
 )
 
 logger = logging.getLogger(__name__)

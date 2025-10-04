@@ -37,7 +37,6 @@ class MessageBuilder:
             message = self._build_message(content=content)
 
             self.signer.sign_message(message=message)
-            print(1111111, message.signature)
 
             if message.sequence_number in self.store.get_messages_ids():
                 return None
@@ -79,10 +78,10 @@ class MessageBuilder:
             status=MessageStatus.PROCESSING,
         )
 
-    def _get_parent_id(self) -> Optional[str]:
+    def _get_parent_id(self) -> str:
         """Get the parent ID for chaining messages"""
         latest = self.store.get_latest()
-        return latest.message_id if latest else None
+        return latest.message_id if latest else ""
 
     def _get_next_sequence_number(self) -> int:
         """Get the next sequence number"""

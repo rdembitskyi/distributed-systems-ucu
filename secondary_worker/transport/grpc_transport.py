@@ -10,7 +10,9 @@ from secondary_worker.domain.messages import (
 )
 from shared.security.auth import validate_auth_token
 from shared.domain.status_codes import StatusCodes
-from secondary_worker.services.replica_message_validation.replica_validation import validate_message
+from secondary_worker.services.replica_message_validation.replica_validation import (
+    validate_message,
+)
 
 from shared.storage.factory import get_messages_storage
 
@@ -28,29 +30,39 @@ class GrpcTransport(SecondaryTransportInterface):
         """Return all messages from the in-memory list"""
         return self._store.get_messages()
 
-    async def replicate_message(self, message: Message, master_token: str) -> MasterMessageReplicaResponse:
+    async def replicate_message(
+        self, message: Message, master_token: str
+    ) -> MasterMessageReplicaResponse:
         """Receive a message from the master"""
         logger.info(f"Replica: Received message: {message}")
+        await asyncio.sleep(5.0)  # Delay for testing
 
         if not validate_auth_token(token=master_token):
             logger.error("Replica: Invalid auth token from master")
             return MasterMessageReplicaResponse(
-                status="error", status_code=StatusCodes.UNAUTHORIZED.value, error_message="Invalid auth token"
+                status="error",
+                status_code=StatusCodes.UNAUTHORIZED.value,
+                error_message="Invalid auth token",
             )
 
         validation_result = validate_message(message=message)
         if not validation_result.is_valid:
-            logger.error(f"Replica: Message validation failed: {message} with error: {validation_result.error}")
+            logger.error(
+                f"Replica: Message validation failed: {message} with error: {validation_result.error}"
+            )
             return MasterMessageReplicaResponse(
-                status="error", status_code=StatusCodes.BAD_REQUEST.value, error_message=validation_result.error
+                status="error",
+                status_code=StatusCodes.BAD_REQUEST.value,
+                error_message=validation_result.error,
             )
         if validation_result.is_duplicated:
             logger.error(f"Replica: Duplicated message received: {message}")
             return MasterMessageReplicaResponse(
-                status="error", status_code=StatusCodes.DUPLICATE_RECEIVED.value, error_message="Duplicated message"
+                status="error",
+                status_code=StatusCodes.DUPLICATE_RECEIVED.value,
+                error_message="Duplicated message",
             )
 
-        await asyncio.sleep(2.0)  # Delay for testing
         result = self._store.add_message(message)
 
         if not result:
@@ -60,7 +72,9 @@ class GrpcTransport(SecondaryTransportInterface):
                 status_code=StatusCodes.INTERNAL_SERVER_ERROR.value,
                 error_message="Failed to add message to the store",
             )
-        return MasterMessageReplicaResponse(status="success", status_code=StatusCodes.OK.value, error_message=None)
+        return MasterMessageReplicaResponse(
+            status="success", status_code=StatusCodes.OK.value, error_message=None
+        )
 
     async def report_health(self) -> MasterHealthCheckResponse:
         """Report health status to master"""
@@ -71,7 +85,9 @@ class GrpcTransport(SecondaryTransportInterface):
         """Start the async gRPC server for secondary worker"""
         self._server = aio.server()
         servicer = GrpcSecondaryServicer(self)
-        worker_messages_pb2_grpc.add_SecondaryWorkerServiceServicer_to_server(servicer, self._server)
+        worker_messages_pb2_grpc.add_SecondaryWorkerServiceServicer_to_server(
+            servicer, self._server
+        )
         self._server.add_insecure_port(f"[::]:{port}")
         await self._server.start()
         logger.info(f"Secondary worker gRPC server started on port {port}")
@@ -98,7 +114,7 @@ class GrpcSecondaryServicer(worker_messages_pb2_grpc.SecondaryWorkerServiceServi
         # Convert domain messages to protobuf messages
         pb_messages = []
         for msg in domain_messages:
-            pb_msg = worker_messages_pb2.Message(
+            pb_msg = worker_messages_pb2.MessageReplicaReceived(
                 message_id=msg.message_id,
                 content=msg.content,
                 sequence_number=msg.sequence_number,
@@ -125,11 +141,15 @@ class GrpcSecondaryServicer(worker_messages_pb2_grpc.SecondaryWorkerServiceServi
         master_token = request.auth_token
 
         # Process the message
-        result = await self.transport.replicate_message(message=message, master_token=master_token)
+        result = await self.transport.replicate_message(
+            message=message, master_token=master_token
+        )
 
         # Return response
         return worker_messages_pb2.MasterMessageReplicaResponse(
-            status=result.status, status_code=result.status_code, error_message=result.error_message
+            status=result.status,
+            status_code=result.status_code,
+            error_message=result.error_message,
         )
 
     async def ReportHealth(self, request, context):

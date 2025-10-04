@@ -1,17 +1,16 @@
 import logging
 from collections import OrderedDict
-from datetime import datetime
 from typing import Dict, List, Optional
-import hashlib
-from shared.domain.messages import Message
+from shared.domain.messages import Message, MessageStatus
 from shared.storage.interface import MessageStoreInterface
-from uuid import uuid4
 from threading import Lock
+from shared.utils.singleton import singleton
 
 
 logger = logging.getLogger(__name__)
 
 
+@singleton
 class MessageStore(MessageStoreInterface):
     """
     Best approach: Combine OrderedDict with auxiliary indexes
@@ -44,13 +43,14 @@ class MessageStore(MessageStoreInterface):
     def add_message(self, message: Message) -> bool:
         """Add a message - O(1) operation"""
         with self.lock:
-            parent_id = None
+            parent_id = ""
             sequence_number = 1
             if self.latest_message:
                 logger.info(f"Found latest message: {self.latest_message}")
                 parent_id = self.latest_message.message_id
                 sequence_number = self.latest_message.sequence_number + 1
 
+            self.set_message_status(message=message, status=MessageStatus.DELIVERED)
             logger.info(f"Adding message: {message}")
             # Store in primary structure
             self.messages[sequence_number] = message
@@ -71,7 +71,11 @@ class MessageStore(MessageStoreInterface):
             return True
 
     def get_messages(self) -> list[Message]:
-        return list(self.messages.values())
+        return [
+            message
+            for message in self.messages.values()
+            if message.status == MessageStatus.DELIVERED
+        ]
 
     def get_messages_ids(self) -> list[dict]:
         return list(self.messages.keys())
@@ -104,6 +108,10 @@ class MessageStore(MessageStoreInterface):
         child_ids = self.children_index.get(msg_id, set())
         return [self.get_by_id(child_id) for child_id in child_ids]
 
+    def set_message_status(self, message: Message, status: MessageStatus):
+        """Set message status - O(1)"""
+        message.status = status
+
     def get_chain_from_message(self, msg_id: str) -> List[Dict]:
         """Get full parent chain from a message - O(n) where n is chain length"""
         chain = []
@@ -123,8 +131,3 @@ class MessageStore(MessageStoreInterface):
         # OrderedDict maintains insertion order
         sequences = list(self.messages.keys())[-n:]
         return [self.messages[seq] for seq in sequences]
-
-    def _calculate_hash(self, message: Dict) -> str:
-        """Calculate hash of a message"""
-        content = f"{message['id']}{message['sequence_number']}{message['content']}"
-        return hashlib.sha256(content.encode()).hexdigest()

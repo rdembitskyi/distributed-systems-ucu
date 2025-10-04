@@ -7,7 +7,9 @@ from secondary_worker.domain.messages import MasterMessageReplicaResponse
 logger = logging.getLogger(__name__)
 
 
-def handle_replication_response_from_workers(active_workers, results: list[MasterMessageReplicaResponse | Exception]):
+def handle_replication_response_from_workers(
+    active_workers, results: list[MasterMessageReplicaResponse | Exception]
+):
     """
     Handle replication responses from workers and determine overall success.
     If any worker fails, the entire replication is considered failed.
@@ -22,10 +24,12 @@ def handle_replication_response_from_workers(active_workers, results: list[Maste
             if isinstance(result, RpcError):
                 retry_workers.append(f"Connection error for worker {worker_id}")
             failed_workers.append(worker_id)
-            error_str = f"Unexpected error: Replication failed for worker {worker_id}: {result}"
+            error_str = (
+                f"Unexpected error: Replication failed for worker {worker_id}: {result}"
+            )
             logger.error(error_messages)
             error_messages.append(error_str)
-        if result.status_code == StatusCodes.UNAUTHORIZED.value:
+        elif result.status_code == StatusCodes.UNAUTHORIZED.value:
             failed_workers.append(worker_id)
             error_str = f"Replication failed for worker {worker_id}: Unauthorized"
             logger.error(error_str)
@@ -37,10 +41,14 @@ def handle_replication_response_from_workers(active_workers, results: list[Maste
             error_messages.append(error_str)
         elif result.status_code == StatusCodes.DUPLICATE_RECEIVED.value:
             # If a duplicate message is received, we should finish replication and not retry the worker
-            logger.warning(f"Replication warning for worker {worker_id}: Duplicated message - {result.error_message}")
+            logger.warning(
+                f"Replication warning for worker {worker_id}: Duplicated message - {result.error_message}"
+            )
         elif result.status_code == StatusCodes.RATE_LIMITED.value:
             retry_workers.append(worker_id)
-            logger.warning(f"Replication warning for worker {worker_id}: Rate limited - {result.error_message}")
+            logger.warning(
+                f"Replication warning for worker {worker_id}: Rate limited - {result.error_message}"
+            )
         elif result.status_code == StatusCodes.INTERNAL_SERVER_ERROR.value:
             failed_workers.append(worker_id)
             error_str = f"Replication failed for worker {worker_id}: Internal Server Error - {result.error_message}"

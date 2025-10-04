@@ -2,8 +2,9 @@
 """Client and server classes corresponding to protobuf-defined services."""
 
 import grpc
+import warnings
 
-from api.generated import messages_pb2 as messages__pb2
+from api.generated import master_messages_pb2 as master__messages__pb2
 
 GRPC_GENERATED_VERSION = "1.75.0"
 GRPC_VERSION = grpc.__version__
@@ -12,14 +13,16 @@ _version_not_supported = False
 try:
     from grpc._utilities import first_version_is_lower
 
-    _version_not_supported = first_version_is_lower(GRPC_VERSION, GRPC_GENERATED_VERSION)
+    _version_not_supported = first_version_is_lower(
+        GRPC_VERSION, GRPC_GENERATED_VERSION
+    )
 except ImportError:
     _version_not_supported = True
 
 if _version_not_supported:
     raise RuntimeError(
         f"The grpc package installed is at version {GRPC_VERSION},"
-        + f" but the generated code in messages_pb2_grpc.py depends on"
+        + f" but the generated code in master_messages_pb2_grpc.py depends on"
         + f" grpcio>={GRPC_GENERATED_VERSION}."
         + f" Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}"
         + f" or downgrade your generated code using grpcio-tools<={GRPC_VERSION}."
@@ -37,14 +40,14 @@ class MessageServiceStub(object):
         """
         self.PostMessage = channel.unary_unary(
             "/messages.MessageService/PostMessage",
-            request_serializer=messages__pb2.PostMessageRequest.SerializeToString,
-            response_deserializer=messages__pb2.PostMessageResponse.FromString,
+            request_serializer=master__messages__pb2.PostMessageRequest.SerializeToString,
+            response_deserializer=master__messages__pb2.PostMessageResponse.FromString,
             _registered_method=True,
         )
         self.GetMessages = channel.unary_unary(
             "/messages.MessageService/GetMessages",
-            request_serializer=messages__pb2.GetMessagesRequest.SerializeToString,
-            response_deserializer=messages__pb2.GetMessagesResponse.FromString,
+            request_serializer=master__messages__pb2.GetMessagesRequest.SerializeToString,
+            response_deserializer=master__messages__pb2.GetMessagesResponse.FromString,
             _registered_method=True,
         )
 
@@ -69,18 +72,22 @@ def add_MessageServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
         "PostMessage": grpc.unary_unary_rpc_method_handler(
             servicer.PostMessage,
-            request_deserializer=messages__pb2.PostMessageRequest.FromString,
-            response_serializer=messages__pb2.PostMessageResponse.SerializeToString,
+            request_deserializer=master__messages__pb2.PostMessageRequest.FromString,
+            response_serializer=master__messages__pb2.PostMessageResponse.SerializeToString,
         ),
         "GetMessages": grpc.unary_unary_rpc_method_handler(
             servicer.GetMessages,
-            request_deserializer=messages__pb2.GetMessagesRequest.FromString,
-            response_serializer=messages__pb2.GetMessagesResponse.SerializeToString,
+            request_deserializer=master__messages__pb2.GetMessagesRequest.FromString,
+            response_serializer=master__messages__pb2.GetMessagesResponse.SerializeToString,
         ),
     }
-    generic_handler = grpc.method_handlers_generic_handler("messages.MessageService", rpc_method_handlers)
+    generic_handler = grpc.method_handlers_generic_handler(
+        "messages.MessageService", rpc_method_handlers
+    )
     server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers("messages.MessageService", rpc_method_handlers)
+    server.add_registered_method_handlers(
+        "messages.MessageService", rpc_method_handlers
+    )
 
 
 # This class is part of an EXPERIMENTAL API.
@@ -104,8 +111,8 @@ class MessageService(object):
             request,
             target,
             "/messages.MessageService/PostMessage",
-            messages__pb2.PostMessageRequest.SerializeToString,
-            messages__pb2.PostMessageResponse.FromString,
+            master__messages__pb2.PostMessageRequest.SerializeToString,
+            master__messages__pb2.PostMessageResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -134,8 +141,8 @@ class MessageService(object):
             request,
             target,
             "/messages.MessageService/GetMessages",
-            messages__pb2.GetMessagesRequest.SerializeToString,
-            messages__pb2.GetMessagesResponse.FromString,
+            master__messages__pb2.GetMessagesRequest.SerializeToString,
+            master__messages__pb2.GetMessagesResponse.FromString,
             options,
             channel_credentials,
             insecure,

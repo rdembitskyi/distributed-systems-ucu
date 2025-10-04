@@ -20,11 +20,13 @@ A distributed message replication system built with Python and gRPC, featuring a
 │   ├── services/             # Logic for validating message integrity and order
 │   └── transport/            # gRPC transport layer
 ├── shared/                   # Shared domain models and utilities
-│   ├── domain/              # Status codes, messages, replication logic
-│   ├── services/            # Utilities for creating messages/  
-│   ├── security/            # Authentication and message signing
-│   └── storage/             # Message storage interfaces
-└── api/                     # API definitions and generated code
+│   ├── domain/               # Status codes, messages, replication logic
+│   ├── services/             # Utilities for creating messages/  
+│   ├── security/             # Authentication and message signing
+│   └── storage/              # Message storage interfaces
+│   └── utils/                # Different helpers for concurrency, etc.
+├── tests/                    # Different tests to verify requirements
+└── api/                      # API definitions and generated code
 ```
 
 ## Quick Start
@@ -73,8 +75,19 @@ A distributed message replication system built with Python and gRPC, featuring a
 
 ```bash
 # Test basic message posting and retrieval
-python test_grpc_client.py
+python tests/test_grpc_client.py
 ```
+### Advanced testing
+
+```bash
+run tests with pytest
+```
+
+It contain test cases for:
+- Message Replication
+- Eventual Consistency
+- Testing for different write concern values
+- Master Worker Synchronization
 
 
 ### Manual Testing Scenarios

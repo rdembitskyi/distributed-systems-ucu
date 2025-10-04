@@ -14,7 +14,10 @@ from secondary_worker.transport.grpc_transport import GrpcTransport
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout), logging.FileHandler("/app/logs/worker.log")],
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler("/app/logs/worker.log"),
+    ],
 )
 
 logger = logging.getLogger(__name__)
@@ -31,7 +34,9 @@ class WorkerServer:
         try:
             logger.info(f"Starting Secondary Worker gRPC server on port {self.port}")
             self.server = await self.transport.start_server(self.port)
-            logger.info(f"Secondary Worker server started successfully on port {self.port}")
+            logger.info(
+                f"Secondary Worker server started successfully on port {self.port}"
+            )
 
             # Keep the server running
             await self.server.wait_for_termination()
@@ -49,7 +54,12 @@ class WorkerServer:
 
 async def main():
     parser = argparse.ArgumentParser(description="Start Secondary Worker gRPC Server")
-    parser.add_argument("--port", type=str, default=50053, help="Port to run the gRPC server on (default: 50053)")
+    parser.add_argument(
+        "--port",
+        type=str,
+        default=50053,
+        help="Port to run the gRPC server on (default: 50053)",
+    )
 
     args = parser.parse_args()
 
