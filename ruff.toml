@@ -1,79 +1,145 @@
-# Exclude a variety of commonly ignored directories.
-exclude = [
-    ".aws-sam",
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".git-rewrite",
-    ".hg",
-    ".ipynb_checkpoints",
+# ===================================================================================
+# A Cool Ruff Configuration | https://github.com/astral-sh/ruff
+# ===================================================================================
+#
+# This file is a comprehensive Ruff configuration that enforces a strict, modern,
+# and consistent Python coding style. It's designed to be a "one-stop shop"
+# for linting and formatting, replacing Black, isort, flake8, and many plugins.
+#
+# To use it, place this file as `ruff.toml` or `.ruff.toml` in your project root.
+# You can also merge it into your `pyproject.toml` under the `[tool.ruff]` section.
+#
+
+# -----------------------------------------------------------------------------------
+# Core Settings
+# -----------------------------------------------------------------------------------
+
+# Set the minimum Python version to target. Ruff will not suggest features
+# that are unavailable in this version. "py38" is a safe, modern default.
+target-version = "py311"
+
+# A list of file patterns to include when linting.
+# By default, Ruff lints *.py, *.pyi, and pyproject.toml.
+# Adding `*.ipynb` is great for projects with Jupyter Notebooks.
+include = ["*.py", "*.pyi", "pyproject.toml", "*.ipynb"]
+
+# A list of file patterns to exclude from linting and formatting.
+# This extends Ruff's default exclusions with common project folders.
+extend-exclude = [
     ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".pyenv",
     ".pytest_cache",
-    ".pytype",
-    ".ruff_cache",
-    ".svn",
-    ".tox",
-    ".venv",
-    ".vscode",
-    "__pypackages__",
-    "_build",
-    "buck-out",
-    "build",
-    "dist",
-    "node_modules",
-    "site-packages",
-    "venv",
-    "src/functions/assets",
-    "src/functions/davis",
-    "src/functions/property_mapper",
-    "src/relational_database",
-    "src/functions/telegram_scraper",
+    "docs/",
+    "site/",
+    "htmlcov/",
+    "build/",
+    "dist/",
 ]
 
-# Same as Black.
-line-length = 120
-indent-width = 4
+# Enable preview mode to opt in to the latest rules, formatter style changes,
+# and other unstable features. This is for those who like to live on the edge!
+preview = true
 
-target-version = "py313"
+# The line length to aim for. Ruff's default of 88 is the same as Black's.
+line-length = 88
 
-[lint]
-select = ["E", "F", "W", "I", "UP"]
-ignore = []
 
-# Allow fix for all enabled rules (when `--fix`) is provided.
-fixable = ["ALL"]
-unfixable = []
-
-# Allow unused variables when underscore-prefixed.
-dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
-
+# -----------------------------------------------------------------------------------
+# Formatter Settings (Replaces Black)
+# -----------------------------------------------------------------------------------
 [format]
-# Like Black, use double quotes for strings.
+# Use double quotes for strings. Options: "double", "single".
 quote-style = "double"
 
-# Like Black, indent with spaces, rather than tabs.
+# Use spaces for indentation. Options: "space", "tab".
 indent-style = "space"
 
-# Like Black, respect magic trailing commas.
+# Respect magic trailing commas. When this is `false` (like Black), a trailing
+# comma on an expression indicates it should be expanded onto multiple lines.
 skip-magic-trailing-comma = false
 
-# Like Black, automatically detect the appropriate line ending.
+# Automatically detect the appropriate line ending. Options: "auto", "lf", "crlf".
 line-ending = "auto"
 
-# Enable auto-formatting of code examples in docstrings. Markdown,
-# reStructuredText code/literal blocks and doctests are all supported.
-#
-# This is currently disabled by default, but it is planned for this
-# to be opt-out in the future.
-docstring-code-format = false
 
-# Set the line length limit used when formatting code snippets in
-# docstrings.
-#
-# This only has an effect when the `docstring-code-format` setting is
-# enabled.
-docstring-code-line-length = "dynamic"
+# -----------------------------------------------------------------------------------
+# Linter Rule Selection (The Heart of Ruff)
+# -----------------------------------------------------------------------------------
+[lint]
+# Select the rule sets to enable. This is the most important section.
+# Start with a good base and add more as you go.
+# See the full list of rules here: https://docs.astral.sh/ruff/rules/
+select = [
+    # --- Core & Essential Checks ---
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # Pyflakes (catches undefined names, unused imports, etc.)
+
+    # --- Import Sorting & Styling (replaces isort) ---
+    "I",   # isort
+
+    # --- Modernization & Best Practices ---
+    "UP",  # pyupgrade (upgrades syntax to newer Python versions)
+    "B",   # flake8-bugbear (finds likely bugs and design problems)
+    "C4",  # flake8-comprehensions (helps write more idiomatic comprehensions)
+    "SIM", # flake8-simplify (simplifies complex code structures)
+
+    # --- Security & Robustness ---
+    "S",   # flake8-bandit (finds common security issues)
+    "A",   # flake8-builtins (prevents shadowing Python builtins)
+    "PTH", # flake8-use-pathlib (enforces using `pathlib` over `os.path`)
+    "TRY", # tryceratops (rules for exceptional exception handling)
+
+    # --- Naming, Docstrings, and Readability ---
+    "N",   # pep8-naming
+    "D",   # pydocstyle (enforces docstring conventions)
+    "T20", # flake8-print (flags `print` and `pprint` calls)
+
+    # --- Ruff-specific Rules ---
+    "RUF", # Ruff's own rules, often for performance or clarity
+]
+
+# Disable specific rules that might be overly pedantic or conflict with project style.
+ignore = [
+    "B905",  # `zip()` without `strict=`. Can be noisy in projects not on Python 3.10+.
+    "S101",  # `assert` statements. We want to allow asserts in tests.
+    "D100",  # Missing docstring in public module.
+    "D104",  # Missing docstring in public package.
+    "D107",  # Missing docstring in `__init__`.
+    "E501",  # Line too long. The formatter handles this, so the linter doesn't need to.
+]
+
+# Allow all rules to be autofixed. This is powerful but use with care.
+fixable = ["ALL"]
+# Rules that should never be auto-fixed, even if a fix is available.
+unfixable = []
+
+
+# -----------------------------------------------------------------------------------
+# Plugin-Specific Configurations
+# -----------------------------------------------------------------------------------
+
+# Settings for import sorting (isort).
+[lint.isort]
+# A list of modules that should be considered "first-party" (your own code).
+# Ruff will automatically detect your project's packages, but you can add more.
+known-first-party = ["my_project_name"]
+# If you want to group certain third-party imports together.
+# known-third-party = ["fastapi", "pydantic", "sqlalchemy"]
+
+# Settings for docstring linting (pydocstyle).
+[lint.pydocstyle]
+# Use Google-style docstrings. Options: "google", "numpy", "pep257".
+convention = "google"
+
+# Settings for flake8-bugbear.
+[lint.flake8-bugbear]
+# Allow using `B008` (function calls in default arguments) for FastAPI dependencies.
+# This shows how to tailor rules for specific frameworks.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
+
+# Per-file ignores allow you to disable rules for specific files or directories.
+[lint.per-file-ignores]
+# In tests, it's common to use asserts, import from `*`, and have short docstrings.
+"tests/**/*.py" = ["S101", "F403", "F405", "D103"]
+# In `__init__.py` files, unused imports are often used to expose an API.
+"__init__.py" = ["F401"]

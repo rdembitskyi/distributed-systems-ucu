@@ -22,7 +22,9 @@ async def test_dockerized_grpc_server():
             # Test 1: Send first message
             logger.info("--- Sending first message ---")
             content1 = "Hello from test client!"
-            request = master_messages_pb2.PostMessageRequest(content=content1, write_concern=3)
+            request = master_messages_pb2.PostMessageRequest(
+                content=content1, write_concern=3
+            )
             logger.info(f"Sending request: {request}")
 
             response1 = await stub.PostMessage(request)
@@ -33,7 +35,9 @@ async def test_dockerized_grpc_server():
             # Test 2: Send second message
             logger.info("\n--- Sending second message ---")
             content2 = "This is another test message."
-            request = master_messages_pb2.PostMessageRequest(content=content2, write_concern=2)
+            request = master_messages_pb2.PostMessageRequest(
+                content=content2, write_concern=2
+            )
             response2 = await stub.PostMessage(request)
             logger.info(
                 f"Server Response: status='{response2.status}', message='{response2.message}', total={response2.total_messages}"
@@ -41,7 +45,9 @@ async def test_dockerized_grpc_server():
 
             # Test 3: Get all messages
             logger.info("\n--- Getting all messages ---")
-            get_response = await stub.GetMessages(master_messages_pb2.GetMessagesRequest())
+            get_response = await stub.GetMessages(
+                master_messages_pb2.GetMessagesRequest()
+            )
             logger.info(f"Received {len(get_response.messages)} messages from server:")
             for i, msg in enumerate(get_response.messages, 1):
                 logger.info(f"  {i}. {msg}")

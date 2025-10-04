@@ -27,9 +27,13 @@ async def wait_for_quorum(tasks, required_count: int, timeout: float):
                 if len(success_tasks) >= required_count:
                     return success_tasks
             except asyncio.TimeoutError as e:
-                logger.error(f"Replication: Task timed out: {e} waiting for replica response")
+                logger.error(
+                    f"Replication: Task timed out: {e} waiting for replica response"
+                )
                 failure_tasks.append(e)
             except Exception as e:
                 logger.error(f"Replication: Error: {e} received from worker")
                 failure_tasks.append(e)
-    raise QuorumNotReached(f"Replication: Failed to reach quorum of {required_count} tasks")
+    raise QuorumNotReached(
+        f"Replication: Failed to reach quorum of {required_count} tasks"
+    )

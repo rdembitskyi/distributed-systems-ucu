@@ -20,7 +20,9 @@ class GrpcTransport(MasterTransportInterface):
         self.builder = MessageBuilder(store=self._store)
         self.workers_service = WorkersService()
 
-    async def save_message(self, message_content: str, write_concern=3) -> dict[str, Any]:
+    async def save_message(
+        self, message_content: str, write_concern=3
+    ) -> dict[str, Any]:
         """Append a message to the in-memory list.
         By default we set write concern to 3 to ensure that the message is replicated to all workers.
         But user can override this by passing write_concern as a parameter in request
@@ -39,7 +41,9 @@ class GrpcTransport(MasterTransportInterface):
             message=message, write_concern=write_concern
         )
         if not replication.success:
-            logger.error(f"Failed to replicate message to {write_concern - 1} workers: {replication.error_message}")
+            logger.error(
+                f"Failed to replicate message to {write_concern - 1} workers: {replication.error_message}"
+            )
             return {
                 "status": "error",
                 "message": f"Failed to replicate message to {write_concern - 1} workers: {replication.error_message}",
@@ -59,7 +63,9 @@ class GrpcTransport(MasterTransportInterface):
         """Start the async gRPC server"""
         self._server = aio.server()
         servicer = GrpcMessageServicer(self)
-        master_messages_pb2_grpc.add_MessageServiceServicer_to_server(servicer, self._server)
+        master_messages_pb2_grpc.add_MessageServiceServicer_to_server(
+            servicer, self._server
+        )
         self._server.add_insecure_port(f"[::]:{port}")
         await self._server.start()
         logger.info(f"gRPC server started on port {port}")
@@ -84,7 +90,9 @@ class GrpcMessageServicer(master_messages_pb2_grpc.MessageServiceServicer):
         content = request.content
         write_concern = request.write_concern
 
-        result = await self.transport.save_message(message_content=content, write_concern=write_concern)
+        result = await self.transport.save_message(
+            message_content=content, write_concern=write_concern
+        )
         logger.info(f"Result of POST message request: {result}")
         return master_messages_pb2.PostMessageResponse(
             status=result["status"],

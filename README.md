@@ -73,8 +73,19 @@ A distributed message replication system built with Python and gRPC, featuring a
 
 ```bash
 # Test basic message posting and retrieval
-python test_grpc_client.py
+python tests/test_grpc_client.py
 ```
+### Advanced testing
+
+```bash
+run tests with pytest
+```
+
+It contain test cases for:
+- Message Replication
+- Eventual Consistency
+- Testing for different write concern values
+- Master Worker Synchronization
 
 
 ### Manual Testing Scenarios
