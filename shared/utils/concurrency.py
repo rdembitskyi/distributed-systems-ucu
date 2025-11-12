@@ -6,7 +6,9 @@ logger = logging.getLogger(__name__)
 
 
 class QuorumNotReached(Exception):
-    pass
+    def __init__(self, message: str, completed_results: list = None):
+        super().__init__(message)
+        self.completed_results = completed_results or []
 
 
 async def wait_for_quorum(tasks, required_count: int, timeout: float):
@@ -25,7 +27,7 @@ async def wait_for_quorum(tasks, required_count: int, timeout: float):
                 logger.info(f"Replication: Success count: {len(success_tasks)}")
 
                 if len(success_tasks) >= required_count:
-                    return success_tasks
+                    return success_tasks + failure_tasks
             except asyncio.TimeoutError as e:
                 logger.error(
                     f"Replication: Task timed out: {e} waiting for replica response"
@@ -35,5 +37,6 @@ async def wait_for_quorum(tasks, required_count: int, timeout: float):
                 logger.error(f"Replication: Error: {e} received from worker")
                 failure_tasks.append(e)
     raise QuorumNotReached(
-        f"Replication: Failed to reach quorum of {required_count} tasks"
+        message=f"Replication: Failed to reach quorum of {required_count} tasks",
+        completed_results=success_tasks + failure_tasks,
     )
