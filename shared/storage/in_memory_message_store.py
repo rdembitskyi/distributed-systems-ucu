@@ -39,6 +39,7 @@ class MessageStore(MessageStoreInterface):
 
         # Thread safety
         self.lock = Lock()
+        self.clients_write_status = {}
 
     def add_message(self, message: Message) -> bool:
         """Add a message - O(1) operation"""
@@ -131,3 +132,11 @@ class MessageStore(MessageStoreInterface):
         # OrderedDict maintains insertion order
         sequences = list(self.messages.keys())[-n:]
         return [self.messages[seq] for seq in sequences]
+
+    def set_node_write_status(self, client_id: str, status: bool):
+        self.clients_write_status[client_id] = status
+
+    def get_node_write_status(self, client_id: str) -> bool:
+        # default is true, if status was not updated it means node is active for connections
+        logger.info(f"here {self.clients_write_status.get(client_id, True)}")
+        return self.clients_write_status.get(client_id, True)

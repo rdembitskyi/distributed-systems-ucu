@@ -46,6 +46,83 @@ def docker_services():
     subprocess.run(["docker-compose", "down"], check=True, cwd=".")
 
 
+@pytest.fixture(scope="function")
+def docker_master():
+    logger.info("Starting master containers...")
+    master = "master"
+    subprocess.run(
+        ["docker-compose", "up", "--build", "-d", master], check=True, cwd="."
+    )
+    wait_for_service("localhost", 50052, timeout=60)
+    logger.info("Master service ready")
+    yield
+
+    logger.info("Shutting down master containers...")
+    subprocess.run(["docker-compose", "down", master], check=True, cwd=".")
+
+
+@pytest.fixture(scope="function")
+def docker_worker_1():
+    logger.info("Starting worker 1 containers...")
+    worker1 = "worker1"
+    subprocess.run(
+        ["docker-compose", "up", "--build", "-d", worker1], check=True, cwd="."
+    )
+    logger.info(f"Waiting for worker service {worker1}...")
+    wait_for_service("localhost", 50053, timeout=60)
+    yield
+
+    logger.info(f"Shutting down worker {worker1} container...")
+    subprocess.run(["docker-compose", "down", worker1], check=True, cwd=".")
+
+
+def start_worker(worker_id: str):
+    """Utility function to start a worker container"""
+    worker_port_dict = {
+        "worker1": 50053,
+        "worker2": 50054,
+    }
+    if worker_id not in worker_port_dict:
+        raise ValueError(f"Worker {worker_id} not exist.")
+
+    logger.info(f"Starting worker {worker_id}...")
+    subprocess.run(
+        ["docker-compose", "up", "--build", "-d", worker_id], check=True, cwd="."
+    )
+    logger.info(f"Waiting for worker service {worker_id}...")
+    wait_for_service("localhost", worker_port_dict[worker_id], timeout=60)
+    logger.info(f"Worker {worker_id} is ready")
+
+
+def stop_worker(worker_id: str):
+    """Utility function to stop a worker container"""
+    logger.info(f"Shutting down worker {worker_id} container...")
+    subprocess.run(["docker-compose", "stop", worker_id], check=False, cwd=".")
+
+
+@pytest.fixture(scope="function")
+def worker_manager():
+    """Fixture that tracks started workers and cleans them up"""
+    started_workers = []
+
+    def _start_worker(worker_id: str):
+        start_worker(worker_id)
+        started_workers.append(worker_id)
+
+    def _stop_worker(worker_id: str):
+        stop_worker(worker_id)
+        if worker_id in started_workers:
+            started_workers.remove(worker_id)
+
+    # Return both functions as a tuple
+    yield (_start_worker, _stop_worker)
+
+    # Cleanup: stop all workers that were started
+    logger.info(f"Cleaning up started workers: {started_workers}")
+    for worker_id in started_workers:
+        stop_worker(worker_id)
+
+
 def wait_for_service(host: str, port: int, timeout: int = 60):
     """Wait for a service to be ready"""
     start = time.time()

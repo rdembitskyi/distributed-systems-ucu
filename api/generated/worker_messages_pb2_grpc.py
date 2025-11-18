@@ -55,6 +55,12 @@ class SecondaryWorkerServiceStub(object):
             response_deserializer=worker__messages__pb2.GetMessagesResponse.FromString,
             _registered_method=True,
         )
+        self.InjectFailure = channel.unary_unary(
+            "/secondary_worker.SecondaryWorkerService/InjectFailure",
+            request_serializer=worker__messages__pb2.InjectFailureRequest.SerializeToString,
+            response_deserializer=worker__messages__pb2.InjectFailureResponse.FromString,
+            _registered_method=True,
+        )
 
 
 class SecondaryWorkerServiceServicer(object):
@@ -78,6 +84,12 @@ class SecondaryWorkerServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def InjectFailure(self, request, context):
+        """Inject failures for n next messages"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
 
 def add_SecondaryWorkerServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -95,6 +107,11 @@ def add_SecondaryWorkerServiceServicer_to_server(servicer, server):
             servicer.GetMessages,
             request_deserializer=worker__messages__pb2.GetMessagesRequest.FromString,
             response_serializer=worker__messages__pb2.GetMessagesResponse.SerializeToString,
+        ),
+        "InjectFailure": grpc.unary_unary_rpc_method_handler(
+            servicer.InjectFailure,
+            request_deserializer=worker__messages__pb2.InjectFailureRequest.FromString,
+            response_serializer=worker__messages__pb2.InjectFailureResponse.SerializeToString,
         ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -189,6 +206,36 @@ class SecondaryWorkerService(object):
             "/secondary_worker.SecondaryWorkerService/GetMessages",
             worker__messages__pb2.GetMessagesRequest.SerializeToString,
             worker__messages__pb2.GetMessagesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True,
+        )
+
+    @staticmethod
+    def InjectFailure(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/secondary_worker.SecondaryWorkerService/InjectFailure",
+            worker__messages__pb2.InjectFailureRequest.SerializeToString,
+            worker__messages__pb2.InjectFailureResponse.FromString,
             options,
             channel_credentials,
             insecure,

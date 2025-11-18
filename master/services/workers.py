@@ -12,6 +12,7 @@ from secondary_worker.domain.messages import MasterMessageReplicaResponse
 from master.services.replication_coordinator import (
     handle_replication_response_from_workers,
 )
+from master.services.write_controller import manage_write_availability
 from master.services.retry_policy import RetryPolicy
 from master.services.heartbeat import HeartBeatService
 from shared.utils.concurrency import wait_for_quorum, QuorumNotReached
@@ -34,6 +35,7 @@ class WorkersService:
         ] = {}
         self.heartbeat_service: HeartBeatService | None = None
         self._initialize_workers()
+        self._background_tasks = {}
 
     def _initialize_workers(self):
         """Initialize static worker registry"""
@@ -65,7 +67,7 @@ class WorkersService:
                 success=False, error_message="No workers available", total_workers=0
             )
 
-        available_workers = self.heartbeat_service.get_available_workers()
+        available_workers = self.heartbeat_service.get_all_workers()
         logger.info(f"Available workers: {available_workers}")
 
         if not available_workers:
@@ -87,8 +89,9 @@ class WorkersService:
 
         try:
             # Wait for workers quorum
+            # returns also tasks still running when quorum was reached
             quorum_count = write_concern - 1  # Subtract 1 for the master
-            results = await wait_for_quorum(
+            quorum_result = await wait_for_quorum(
                 tasks=replication_tasks,
                 required_count=quorum_count,
                 timeout=self.replication_timeout,
@@ -96,12 +99,19 @@ class WorkersService:
 
             # Check if all replications succeeded
             replication_statuses = handle_replication_response_from_workers(
-                results=results
+                results=quorum_result.completed_results
             )
             if not replication_statuses.success:
                 self.replicate_message_to_remaining_workers(
                     message=message, replication_statuses=replication_statuses
                 )
+            if quorum_result.pending_tasks:
+                task = asyncio.create_task(
+                    self.handle_results_from_pending_workers(
+                        message=message, pending_tasks=quorum_result.pending_tasks
+                    )
+                )
+                self._add_task_worker_instance(task=task)
 
             logger.info(
                 f"Successfully replicated message {message.message_id} to {quorum_count} workers"
@@ -118,6 +128,8 @@ class WorkersService:
             logger.warning(
                 f"Replication: Failed to reach quorum of {quorum_count} workers"
             )
+            # TODO block node till quorum is reached
+            manage_write_availability(client_id=message.client_id, availability=False)
             replication_statuses = handle_replication_response_from_workers(
                 results=e.completed_results
             )
@@ -128,8 +140,14 @@ class WorkersService:
                     message=message,
                 )
                 if retry_result.success:
+                    manage_write_availability(
+                        client_id=message.client_id, availability=True
+                    )
                     return ReplicationResult(success=True)
                 if retry_result.success_count >= quorum_count:
+                    manage_write_availability(
+                        client_id=message.client_id, availability=True
+                    )
                     self.replicate_message_to_remaining_workers(
                         message=message, replication_statuses=replication_statuses
                     )
@@ -170,12 +188,21 @@ class WorkersService:
             )
 
             # Send replication request
-            result = await client.ReplicateMessage(request)
+            async with asyncio.timeout(self.replication_timeout):
+                result = await client.ReplicateMessage(request)
             return MasterMessageReplicaResponse(
                 status=result.status,
                 status_code=result.status_code,
                 error_message=result.error_message,
                 worker_id=worker_id,
+            )
+        except asyncio.TimeoutError:
+            logger.error(f"Replication timeout after {self.replication_timeout}s")
+            return MasterMessageReplicaResponse(
+                worker_id=worker_id,
+                status=MessageStatus.FAILED.value,
+                status_code=StatusCodes.TIMEOUT.value,
+                error_message=f"Replication timeout after {self.replication_timeout}s",
             )
         except Exception as e:
             logger.warning(f"Unexpected error during replication: {e}")
@@ -215,7 +242,7 @@ class WorkersService:
         self,
         worker_id: str,
         message: Message,
-    ) -> ReplicationResult:
+    ) -> tuple[ReplicationResult, str]:
         """Retry replication to a worker based on the given retry policy"""
         state = self.heartbeat_service.get_worker_state(worker_id=worker_id)
         policy = RetryPolicy.for_health_state(state=state)
@@ -226,14 +253,15 @@ class WorkersService:
                 results=[result]
             )
             if replication_status.success:
-                return replication_status
+                # Task cleanup happens automatically via callback
+                return replication_status, worker_id
 
             last_result = replication_status
             if attempt < policy.max_attempts - 1:
                 delay = policy.calculate_delay(attempt=attempt)
                 await asyncio.sleep(delay)
 
-        return last_result
+        return last_result, worker_id
 
     async def retry_replication_until_quorum_is_reached(
         self, replication_statuses: ReplicationResult, quorum_count, message
@@ -241,19 +269,16 @@ class WorkersService:
         workers_to_retry = [
             worker_id for worker_id in replication_statuses.retry_workers
         ]
-        retry_tasks = {
+        retry_tasks = [
             asyncio.create_task(
                 self.retry_replication_using_policy(
                     worker_id=worker_id, message=message
                 )
-            ): worker_id
+            )
             for worker_id in workers_to_retry
-        }
-        for coro in asyncio.as_completed(
-            retry_tasks.keys(), timeout=self.replication_timeout
-        ):
-            retry_result = await coro
-            worker_id = retry_tasks[coro]
+        ]
+        for task in asyncio.as_completed(retry_tasks):
+            retry_result, worker_id = await task
             if retry_result.success:
                 replication_statuses.remove_retry_worker(worker_id=worker_id)
                 if replication_statuses.success_count >= quorum_count:
@@ -274,9 +299,39 @@ class WorkersService:
         remaining_workers = replication_statuses.retry_workers
         # Fire background task for remaining workers
         for worker_id in remaining_workers:
-            asyncio.create_task(
+            task = asyncio.create_task(
                 self.retry_replication_using_policy(
                     worker_id=worker_id, message=message
                 )
             )
+            self._background_tasks[hash(task)] = task
         return True
+
+    async def handle_results_from_pending_workers(
+        self, message: Message, pending_tasks: List[asyncio.Task]
+    ):
+        completed_results = await asyncio.gather(*pending_tasks, return_exceptions=True)
+        replication_statuses = handle_replication_response_from_workers(
+            results=completed_results
+        )
+        if not replication_statuses.success:
+            self.replicate_message_to_remaining_workers(
+                message=message, replication_statuses=replication_statuses
+            )
+
+    def _add_task_worker_instance(self, task: asyncio.Task):
+        """
+        Keep a strong reference to background tasks to prevent garbage collection.
+
+        Python's asyncio doesn't hold strong references to tasks created with
+        create_task(). Without storing a reference, tasks may be garbage collected
+        before completion, causing them to be cancelled silently.
+
+        This method stores the task and automatically cleans it up when done via
+        a callback to prevent unbounded memory growth.
+        """
+        task_id = hash(task)
+        self._background_tasks[task_id] = task
+
+        # Auto-cleanup when task completes to prevent memory leak
+        task.add_done_callback(lambda t: self._background_tasks.pop(task_id, None))

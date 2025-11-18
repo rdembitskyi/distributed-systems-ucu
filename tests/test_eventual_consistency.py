@@ -36,7 +36,7 @@ async def test_write_concern_1_immediate_response_eventual_consistency(
 
     response = await master_client.PostMessage(
         master_messages_pb2.PostMessageRequest(
-            content=test_content, write_concern=write_concern
+            content=test_content, write_concern=write_concern, client_id="random"
         )
     )
 
@@ -108,7 +108,9 @@ async def test_write_concern_1_multiple_messages_eventual_consistency(
     for i in range(num_messages):
         content = f"Message {i + 1}"
         response = await master_client.PostMessage(
-            master_messages_pb2.PostMessageRequest(content=content, write_concern=1)
+            master_messages_pb2.PostMessageRequest(
+                content=content, write_concern=1, client_id="random"
+            )
         )
         assert response.status == "success"
         sent_messages.append(content)
@@ -155,7 +157,9 @@ async def test_write_concern_1_vs_3_timing_difference(docker_services, master_cl
     # Test w=1 (fast)
     start = time.time()
     response1 = await master_client.PostMessage(
-        master_messages_pb2.PostMessageRequest(content="w=1 message", write_concern=1)
+        master_messages_pb2.PostMessageRequest(
+            content="w=1 message", write_concern=1, client_id="random"
+        )
     )
     w1_duration = time.time() - start
 
@@ -166,7 +170,9 @@ async def test_write_concern_1_vs_3_timing_difference(docker_services, master_cl
     # Test w=3 (slow)
     start = time.time()
     response3 = await master_client.PostMessage(
-        master_messages_pb2.PostMessageRequest(content="w=3 message", write_concern=3)
+        master_messages_pb2.PostMessageRequest(
+            content="w=3 message", write_concern=3, client_id="random"
+        )
     )
     w3_duration = time.time() - start
 

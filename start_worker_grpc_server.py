@@ -13,7 +13,7 @@ from secondary_worker.transport.grpc_transport import GrpcTransport
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    format="%(asctime)s - %(name)s - [%(filename)s:%(lineno)d] - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(sys.stdout),
         logging.FileHandler("/app/logs/worker.log"),

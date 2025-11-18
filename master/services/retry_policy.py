@@ -17,13 +17,13 @@ class RetryPolicy:
         """Get retry policy based on worker health state"""
         policies = {
             WorkerHealthState.HEALTHY: RetryPolicy(
-                max_attempts=10, base_delay=0.5, max_delay=15.0
+                max_attempts=5, base_delay=0.5, max_delay=15.0
             ),
             WorkerHealthState.SUSPECTED: RetryPolicy(
-                max_attempts=5, base_delay=2.0, max_delay=30.0
+                max_attempts=10, base_delay=2.0, max_delay=30.0
             ),
             WorkerHealthState.UNHEALTHY: RetryPolicy(
-                max_attempts=1, base_delay=5.0, max_delay=45.0
+                max_attempts=20, base_delay=10.0, max_delay=60.0
             ),
         }
         return policies[state]

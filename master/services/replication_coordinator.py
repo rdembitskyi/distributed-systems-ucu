@@ -41,7 +41,7 @@ def handle_replication_response_from_workers(
         elif result.status_code == StatusCodes.INTERNAL_SERVER_ERROR.value:
             retry_workers.append(worker_id)
             error_str = f"Replication failed for worker {worker_id}: Internal Server Error - {result.error_message}"
-            logger.error(error_str)
+            logger.warning(error_str)
             error_messages.append(error_str)
 
     if retry_workers:

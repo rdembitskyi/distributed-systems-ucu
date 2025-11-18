@@ -172,6 +172,9 @@ class HeartBeatService:
         """Get current health info of a worker"""
         return self.worker_health.get(worker_id)
 
+    def get_all_workers(self) -> List[str]:
+        return [wid for wid, info in self.worker_health.items()]
+
     def get_healthy_workers(self) -> List[str]:
         """Get list of HEALTHY worker IDs"""
         return [

@@ -16,6 +16,9 @@ class MasterMessageReplicaResponse:
     error_message: str | None
     worker_id: str | None = None
 
+    def __bool__(self):
+        return bool(self.status_code == 200)
+
 
 @dataclass
 class MasterHealthCheckRequest:

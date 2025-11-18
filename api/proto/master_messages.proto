@@ -15,6 +15,7 @@ service MessageService {
 message PostMessageRequest {
   string content = 1;
   int32 write_concern = 2; // Number of replicas required to acknowledge the write
+  string client_id = 3;
 }
 
 // Message data structure. Used for replication and storage.

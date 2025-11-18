@@ -25,6 +25,17 @@ class GrpcTransport(SecondaryTransportInterface):
 
     def __init__(self):
         self._store = get_messages_storage()
+        self._fail_next_n_attempts = 0
+
+    def should_fail(self) -> bool:
+        return self._fail_next_n_attempts > 0
+
+    def consume_failure(self):
+        self._fail_next_n_attempts -= 1
+
+    async def inject_failure(self, attempts: int):
+        """Inject failure information"""
+        self._fail_next_n_attempts = attempts
 
     async def get_messages(self) -> list[str]:
         """Return all messages from the in-memory list"""
@@ -129,6 +140,11 @@ class GrpcSecondaryServicer(worker_messages_pb2_grpc.SecondaryWorkerServiceServi
         """Handle message reception from master"""
         logger.info(f"Replica: Received replication message request: {request.message}")
 
+        if self.transport.should_fail() > 0:
+            self.transport.consume_failure()
+            logger.warning("Injected failure - throwing exception")
+            raise Exception("Injected failure for testing")
+
         # Convert protobuf to domain object
         message = Message(
             message_id=request.message.message_id,
@@ -159,3 +175,8 @@ class GrpcSecondaryServicer(worker_messages_pb2_grpc.SecondaryWorkerServiceServi
         await self.transport.report_health()
 
         return worker_messages_pb2.MasterHealthCheckResponse(status="healthy")
+
+    async def InjectFailure(self, request, context):
+        logger.info(f"Replica: Received injection failure request: {request}")
+        await self.transport.inject_failure(request.fail_next_n_requests)
+        return worker_messages_pb2.InjectFailureResponse(status=True)

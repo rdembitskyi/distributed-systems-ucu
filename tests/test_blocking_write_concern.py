@@ -35,7 +35,7 @@ async def test_write_concern_3_blocks_until_all_workers_ack(
 
     response = await master_client.PostMessage(
         master_messages_pb2.PostMessageRequest(
-            content=test_content, write_concern=write_concern
+            content=test_content, write_concern=write_concern, client_id="random"
         )
     )
 
@@ -89,7 +89,9 @@ async def test_write_concern_3_total_ordering(
     for i in range(num_messages):
         content = f"Message {i + 1}"
         response = await master_client.PostMessage(
-            master_messages_pb2.PostMessageRequest(content=content, write_concern=3)
+            master_messages_pb2.PostMessageRequest(
+                content=content, write_concern=3, client_id="random"
+            )
         )
         assert response.status == "success"
         sent_messages.append(content)
@@ -141,7 +143,7 @@ async def test_write_concern_3_parent_child_relationships(
     for i in range(3):
         response = await master_client.PostMessage(
             master_messages_pb2.PostMessageRequest(
-                content=f"Message {i + 1}", write_concern=3
+                content=f"Message {i + 1}", write_concern=3, client_id="random"
             )
         )
         assert response.status == "success"

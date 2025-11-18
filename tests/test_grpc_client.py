@@ -36,7 +36,7 @@ async def test_dockerized_grpc_server():
             logger.info("--- Sending first message ---")
             content1 = "Hello from test client!"
             request = master_messages_pb2.PostMessageRequest(
-                content=content1, write_concern=3
+                content=content1, write_concern=3, client_id="random"
             )
             logger.info(f"Sending request: {request}")
 
@@ -71,7 +71,7 @@ async def test_dockerized_grpc_server():
             logger.info("\n--- Sending second message ---")
             content2 = "This is another test message."
             request = master_messages_pb2.PostMessageRequest(
-                content=content2, write_concern=2
+                content=content2, write_concern=2, client_id="random"
             )
             response2 = await stub.PostMessage(request)
             logger.info(

@@ -21,12 +21,13 @@ class MessageBuilder:
         self.store = store
         self.signer = FernetMessageSigner()
 
-    def create_message(self, content: str) -> Message | None:
+    def create_message(self, content: str, client_id: str) -> Message | None:
         """
         Create and store a new message with proper validation and chaining.
 
         Args:
             content: The message content
+            client_id: The client id
 
         """
         if not self._validate_content(content):
@@ -34,7 +35,7 @@ class MessageBuilder:
             return None
 
         try:
-            message = self._build_message(content=content)
+            message = self._build_message(content=content, client_id=client_id)
 
             self.signer.sign_message(message=message)
 
@@ -63,7 +64,7 @@ class MessageBuilder:
 
         return True
 
-    def _build_message(self, content: str) -> Message:
+    def _build_message(self, content: str, client_id: str) -> Message:
         """Build a Message object with proper metadata"""
         msg_id = str(uuid4())
         parent_id = self._get_parent_id()
@@ -71,6 +72,7 @@ class MessageBuilder:
 
         return Message(
             message_id=msg_id,
+            client_id=client_id,
             content=content.strip(),
             sequence_number=sequence_number,
             parent_id=parent_id,

@@ -7,7 +7,7 @@ from shared.domain.messages import Message
 from shared.storage.factory import get_messages_storage
 from shared.services.message_bulder import MessageBuilder
 from master.services.workers import WorkersService
-
+from master.services.write_controller import get_write_availability
 
 logger = logging.getLogger(__name__)
 
@@ -21,13 +21,15 @@ class GrpcTransport(MasterTransportInterface):
         self.workers_service = WorkersService()
 
     async def save_message(
-        self, message_content: str, write_concern=3
+        self, message_content: str, client_id: str, write_concern=3
     ) -> dict[str, Any]:
         """Append a message to the in-memory list.
         By default we set write concern to 3 to ensure that the message is replicated to all workers.
         But user can override this by passing write_concern as a parameter in request
         """
-        message = self.builder.create_message(content=message_content)
+        message = self.builder.create_message(
+            content=message_content, client_id=client_id
+        )
 
         if not message:
             return {
@@ -37,17 +39,9 @@ class GrpcTransport(MasterTransportInterface):
             }
 
         self._store.add_message(message=message)
-        replication = await self.workers_service.replicate_message_to_workers(
+        await self.workers_service.replicate_message_to_workers(
             message=message, write_concern=write_concern
         )
-        if not replication.success:
-            logger.error(
-                f"Failed to replicate message to {write_concern - 1} workers: {replication.error_message}"
-            )
-            return {
-                "status": "error",
-                "message": f"Failed to replicate message to {write_concern - 1} workers: {replication.error_message}",
-            }
 
         return {
             "status": "success",
@@ -88,10 +82,18 @@ class GrpcMessageServicer(master_messages_pb2_grpc.MessageServiceServicer):
         """Handle POST message requests"""
         logger.info(f"Received POST message request: {request}")
         content = request.content
+        client_id = request.client_id
+        write_availability = get_write_availability(client_id=client_id)
+        logger.info(f"Write availability: {write_availability}")
+        if not write_availability:
+            return master_messages_pb2.PostMessageResponse(
+                status="failure",
+                message="Service temporarily unavailable for writes (quorum lost)",
+            )
         write_concern = request.write_concern
 
         result = await self.transport.save_message(
-            message_content=content, write_concern=write_concern
+            message_content=content, write_concern=write_concern, client_id=client_id
         )
         logger.info(f"Result of POST message request: {result}")
         return master_messages_pb2.PostMessageResponse(
