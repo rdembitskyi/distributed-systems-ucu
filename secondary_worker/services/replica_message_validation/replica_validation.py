@@ -26,8 +26,8 @@ logger = logging.getLogger(__name__)
 def validate_message(message: Message) -> ValidationResult:
     try:
         verify_message_signature(message=message)
-        verify_message_sequence_order(message=message)
         verify_no_duplicate_message(message=message)
+        verify_message_sequence_order(message=message)
     except InvalidSignatureError:
         return ValidationResult(
             is_valid=False,

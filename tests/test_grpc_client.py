@@ -1,3 +1,7 @@
+"""
+Tests for iteration 1: Old approach, you need to
+"""
+
 import asyncio
 import logging
 
@@ -22,7 +26,7 @@ def get_worker_client(port: int):
     return worker_messages_pb2_grpc.SecondaryWorkerServiceStub(channel)
 
 
-async def test_dockerized_grpc_server():
+async def test_dockerized_grpc_server(docker_services):
     """
     Test client for sending requests to a dockerized gRPC server.
     The server should be running via start_grpc_server.py.
@@ -99,7 +103,3 @@ async def test_dockerized_grpc_server():
         logger.error(f"Connection error: {e}")
         logger.error("Make sure the gRPC server is running on localhost:50052")
         raise
-
-
-if __name__ == "__main__":
-    asyncio.run(test_dockerized_grpc_server())

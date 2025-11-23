@@ -16,5 +16,4 @@ class ClientStateManager:
 
     def get_master_write_status(self, client_id: str) -> bool:
         # default is true, if status was not updated it means node is active for connections
-        logger.info(f"here {self._client_states.get(client_id, True)}")
         return self._client_states.get(client_id, True)

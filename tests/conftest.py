@@ -23,13 +23,13 @@ def docker_services():
     """
     logger.info("Starting Docker containers...")
 
-    # Start docker-compose
-    subprocess.run(["docker-compose", "up", "--build", "-d"], check=True, cwd=".")
-
-    # Wait for services to be ready
-    logger.info("Waiting for master service on port 50052...")
-    wait_for_service("localhost", 50052, timeout=60)
-    logger.info("Master service ready")
+    # Start workers first
+    logger.info("Starting worker containers...")
+    subprocess.run(
+        ["docker-compose", "up", "--build", "-d", "worker1", "worker2"],
+        check=True,
+        cwd=".",
+    )
 
     logger.info("Waiting for worker1 service on port 50053...")
     wait_for_service("localhost", 50053, timeout=60)
@@ -38,6 +38,16 @@ def docker_services():
     logger.info("Waiting for worker2 service on port 50054...")
     wait_for_service("localhost", 50054, timeout=60)
     logger.info("Worker2 service ready")
+
+    # Now start master
+    logger.info("Starting master container...")
+    subprocess.run(
+        ["docker-compose", "up", "--build", "-d", "master"], check=True, cwd="."
+    )
+
+    logger.info("Waiting for master service on port 50052...")
+    wait_for_service("localhost", 50052, timeout=60)
+    logger.info("Master service ready")
 
     logger.info("All grpc services ready!\n")
 
@@ -188,4 +198,4 @@ async def worker2_client():
 
 
 def return_timeout():
-    return 15.5
+    return 5.5

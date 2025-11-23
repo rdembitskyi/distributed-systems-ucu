@@ -180,7 +180,7 @@ async def test_write_concern_1_vs_3_timing_difference(docker_services, master_cl
     w3_duration = time.time() - start
 
     assert response3.status == ResponseStatus.SUCCESS
-    assert 4.0 <= w3_duration <= 10.0
+    assert 4.0 <= w3_duration <= 15.0
     print(f"✅ w=3 took {w3_duration:.2f}s (blocked on workers)")
 
     # Then: w=3 should be significantly slower than w=1

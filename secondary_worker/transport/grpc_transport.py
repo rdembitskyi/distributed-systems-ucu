@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 
 from grpc import aio
 
@@ -15,7 +16,6 @@ from secondary_worker.services.replica_message_validation.replica_validation imp
 )
 from secondary_worker.services.sync_service import WorkerSyncService
 from secondary_worker.transport.interface import SecondaryTransportInterface
-from shared.domain.messages import MessageStatus
 from shared.domain.response import HealthStatus, ResponseStatus, SyncStatus
 from shared.domain.status_codes import StatusCodes
 from shared.security.auth import validate_auth_token
@@ -57,7 +57,8 @@ class GrpcTransport(SecondaryTransportInterface):
     ) -> MasterMessageReplicaResponse:
         """Receive a message from the master"""
         logger.info(f"Replica: Received message: {message}")
-        await asyncio.sleep(5.0)  # Delay for testing
+        testing_delay = int(os.getenv("TESTING_DELAY", 5))
+        await asyncio.sleep(testing_delay)  # Delay for testing
 
         if not validate_auth_token(token=master_token):
             logger.error("Replica: Invalid auth token from master")

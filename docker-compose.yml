@@ -48,6 +48,7 @@ services:
       MASTER_PORT: 50052
       PORT: 50053
       MACHINE_ID: 1234
+      TESTING_DELAY: 5
     volumes:
       - ./logs:/app/logs
     restart: unless-stopped
@@ -66,6 +67,7 @@ services:
       <<: *common-env
       PORT: 50054
       MACHINE_ID: 5678
+      TESTING_DELAY: 5
     volumes:
       - ./logs:/app/logs
     restart: unless-stopped
