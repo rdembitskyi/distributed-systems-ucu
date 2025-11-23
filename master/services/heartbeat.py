@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class Thresholds(Enum):
     HEALTH_THRESHOLD = 0.9
     SUSPECTED_THRESHOLD = 0.6
-    UNHEALTHY_THRESHOLD = 0.3
+    UNHEALTHY_THRESHOLD = 0.2
 
 
 @dataclass
@@ -57,7 +57,8 @@ class HeartBeatService:
         self,
         workers: List[Worker],
         health_check_func: Callable[[str], Awaitable[bool]],
-        check_interval: int = 10,
+        recovery_callback: Callable,
+        check_interval: int = 5,
     ):
         self.workers: list[Worker] = workers
         self.worker_health: Dict[str, WorkerHealthInfo] = {
@@ -65,6 +66,7 @@ class HeartBeatService:
             for worker in self.workers
         }
         self.health_check_func = health_check_func
+        self.recovery_callback = recovery_callback
         self.check_interval = check_interval
         self._task = None
         self._running = False
@@ -113,6 +115,12 @@ class HeartBeatService:
             logger.info(
                 f"HealthCheckResult for worker {worker.worker_id}: is_alive = {is_alive}"
             )
+            needs_recovery_notification = (
+                self._process_health_check_result(result=check_result) is True
+            )
+            if needs_recovery_notification:
+                result = await self.recovery_callback(worker_id=worker.worker_id)
+                logger.info(f"Worker {worker.worker_id} recovery status: {result}")
         except Exception as e:
             logger.error(f"Error in heartbeat loop: {e}")
             check_result = HealthCheckResult(
@@ -121,7 +129,6 @@ class HeartBeatService:
             logger.info(
                 f"HealthCheckResult for worker {worker.worker_id} failed: {check_result.details}"
             )
-        self._process_health_check_result(result=check_result)
 
     def _process_health_check_result(self, result: HealthCheckResult):
         worker_health = self.worker_health.get(result.worker_id)
@@ -148,20 +155,29 @@ class HeartBeatService:
                 new_state = WorkerHealthState.HEALTHY
 
         elif worker_health.state == WorkerHealthState.UNHEALTHY:
+            logger.info(f"Worker {worker_health.worker_id} needs recovery")
             if worker_health.success_rate >= Thresholds.SUSPECTED_THRESHOLD.value:
                 new_state = WorkerHealthState.SUSPECTED
             if worker_health.success_rate >= Thresholds.HEALTH_THRESHOLD.value:
                 new_state = WorkerHealthState.HEALTHY
+            if result.is_healthy:
+                new_state = WorkerHealthState.SUSPECTED  # For debugging - i don't want to wait; This is naive for prod ready app.
 
         # Apply state change
         if new_state != old_state:
             logger.warning(
                 f"Worker {worker_health.worker_id} state transition: "
                 f"{old_state.value} -> {new_state.value} "
-                f"(success_rate: {success_rate:.1%}"
+                f"(success_rate: {success_rate})"
             )
             worker_health.state = new_state
             worker_health.last_state_change = datetime.now()
+            if (
+                new_state != WorkerHealthState.UNHEALTHY
+                and old_state == WorkerHealthState.UNHEALTHY
+            ):
+                logger.info(f"Worker {worker_health.worker_id} needs recovery")
+                return True
 
     def get_worker_state(self, worker_id: str) -> WorkerHealthState:
         """Get current health state of a worker"""

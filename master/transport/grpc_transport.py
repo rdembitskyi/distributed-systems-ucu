@@ -1,6 +1,7 @@
 import logging
 from grpc import aio
 from typing import Any
+from shared.security.auth import validate_auth_token
 from master.transport.interface import MasterTransportInterface
 from api.generated import master_messages_pb2, master_messages_pb2_grpc
 from shared.domain.messages import Message
@@ -16,8 +17,8 @@ class GrpcTransport(MasterTransportInterface):
     """gRPC implementation of TransportInterface"""
 
     def __init__(self):
-        self._store = get_messages_storage()
-        self.builder = MessageBuilder(store=self._store)
+        self.store = get_messages_storage()
+        self.builder = MessageBuilder(store=self.store)
         self.workers_service = WorkersService()
 
     async def save_message(
@@ -27,6 +28,14 @@ class GrpcTransport(MasterTransportInterface):
         By default we set write concern to 3 to ensure that the message is replicated to all workers.
         But user can override this by passing write_concern as a parameter in request
         """
+
+        if not message_content:
+            return {
+                "status": "error",
+                "message": "Message cannot be empty",
+                "total_messages": len(self.store.get_messages()),
+            }
+
         message = self.builder.create_message(
             content=message_content, client_id=client_id
         )
@@ -35,10 +44,10 @@ class GrpcTransport(MasterTransportInterface):
             return {
                 "status": "error",
                 "message": "Failed to create message",
-                "total_messages": len(self._store.get_messages()),
+                "total_messages": len(self.store.get_messages()),
             }
 
-        self._store.add_message(message=message)
+        self.store.add_message(message=message)
         await self.workers_service.replicate_message_to_workers(
             message=message, write_concern=write_concern
         )
@@ -46,12 +55,21 @@ class GrpcTransport(MasterTransportInterface):
         return {
             "status": "success",
             "message": "Message added successfully",
-            "total_messages": len(self._store.messages),
+            "total_messages": len(self.store.messages),
         }
 
     async def get_messages(self) -> list[Message]:
         """Return all messages from the in-memory list"""
-        return self._store.get_messages()
+        return self.store.get_messages()
+
+    async def get_worker_missing_messages(self, last_sequence_number: int):
+        """Get all messages after the worker's last known sequence number"""
+        if last_sequence_number == 0:
+            # Worker has no messages (sequence 0) - return all messages
+            return self.store.get_messages()
+
+        worker_latest = self.store.get_by_sequence(last_sequence_number)
+        return self.store.get_children(worker_latest.message_id)
 
     async def start_server(self, port: int = 50051):
         """Start the async gRPC server"""
@@ -119,3 +137,28 @@ class GrpcMessageServicer(master_messages_pb2_grpc.MessageServiceServicer):
             pb_messages.append(pb_msg)
         logger.info(f"Result of GET messages request: {pb_messages}")
         return master_messages_pb2.GetMessagesResponse(messages=pb_messages)
+
+    async def CatchUp(self, request, context):
+        """Handle Catch-up requests"""
+        if not validate_auth_token(token=request.auth_token):
+            logger.error("Replica: Invalid auth token from worker")
+            return master_messages_pb2.CatchUpResponse(status="failure", messages=[])
+        missing_messages = await self.transport.get_worker_missing_messages(
+            last_sequence_number=request.last_sequence_number
+        )
+        logger.info(f"Missing messages: {missing_messages}")
+        # Convert domain messages to protobuf messages
+        pb_messages = []
+        for msg in missing_messages:
+            pb_msg = master_messages_pb2.SignedMessage(
+                message_id=msg.message_id,
+                content=msg.content,
+                sequence_number=msg.sequence_number,
+                parent_id=msg.parent_id,
+                timestamp=msg.timestamp,
+                signature=msg.signature,
+            )
+            pb_messages.append(pb_msg)
+        return master_messages_pb2.CatchUpResponse(
+            status="success", messages=pb_messages
+        )

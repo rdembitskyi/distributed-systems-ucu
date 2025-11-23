@@ -58,6 +58,7 @@ def verify_message_sequence_order(message: Message) -> bool:
     storage = get_messages_storage()
     parent = storage.get_by_id(msg_id=message.parent_id)
     if not parent:
+        logger.warning(f"Message {message} parent not found")
         raise InvalidParentIdError()
 
     if parent.sequence_number != message.sequence_number - 1:

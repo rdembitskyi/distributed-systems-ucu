@@ -12,6 +12,7 @@ from secondary_worker.domain.messages import MasterMessageReplicaResponse
 from master.services.replication_coordinator import (
     handle_replication_response_from_workers,
 )
+from shared.storage.factory import get_messages_storage
 from master.services.write_controller import manage_write_availability
 from master.services.retry_policy import RetryPolicy
 from master.services.heartbeat import HeartBeatService
@@ -50,6 +51,7 @@ class WorkersService:
         self.heartbeat_service = HeartBeatService(
             workers=list(self.workers.values()),
             health_check_func=self.health_check_worker,
+            recovery_callback=self.send_on_worker_recovery_request,
         )
         self.heartbeat_service.start_monitoring()
 
@@ -128,7 +130,6 @@ class WorkersService:
             logger.warning(
                 f"Replication: Failed to reach quorum of {quorum_count} workers"
             )
-            # TODO block node till quorum is reached
             manage_write_availability(client_id=message.client_id, availability=False)
             replication_statuses = handle_replication_response_from_workers(
                 results=e.completed_results
@@ -246,7 +247,9 @@ class WorkersService:
         """Retry replication to a worker based on the given retry policy"""
         state = self.heartbeat_service.get_worker_state(worker_id=worker_id)
         policy = RetryPolicy.for_health_state(state=state)
-        last_result = None
+        last_result = ReplicationResult(
+            success=False,
+        )
         for attempt in range(policy.max_attempts):
             result = await self.replicate_to_worker(worker_id, message)
             replication_status = handle_replication_response_from_workers(
@@ -304,7 +307,7 @@ class WorkersService:
                     worker_id=worker_id, message=message
                 )
             )
-            self._background_tasks[hash(task)] = task
+            self._add_task_worker_instance(task=task)
         return True
 
     async def handle_results_from_pending_workers(
@@ -332,6 +335,22 @@ class WorkersService:
         """
         task_id = hash(task)
         self._background_tasks[task_id] = task
-
+        # TODO queue with max of 1000
         # Auto-cleanup when task completes to prevent memory leak
         task.add_done_callback(lambda t: self._background_tasks.pop(task_id, None))
+
+    async def send_on_worker_recovery_request(self, worker_id: str):
+        storage = get_messages_storage()
+        last_message = storage.get_latest()
+        auth_token = get_auth_token()
+        master_latest_sequence = last_message.sequence_number if last_message else 0
+        request = worker_messages_pb2.RecoveryNotification(
+            master_latest_sequence=master_latest_sequence, auth_token=auth_token
+        )
+
+        client = self.worker_clients[worker_id]
+        result = await client.HandleRecovery(request)
+        logger.info(
+            f"Received recovery notification for worker {worker_id}: result={result}"
+        )
+        return result

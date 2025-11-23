@@ -180,7 +180,7 @@ async def test_message_secondary_blocked_waiting_on_quorum(
         )
 
     blocking_message_task = asyncio.create_task(send_message())
-    await asyncio.sleep(15)  # wait till node would be in read-only
+    await asyncio.sleep(15.5)  # wait till node would be in read-only
 
     follow_up_response = await master_client.PostMessage(
         master_messages_pb2.PostMessageRequest(
@@ -196,7 +196,7 @@ async def test_message_secondary_blocked_waiting_on_quorum(
 
     # Now start worker2 to restore quorum
     start_worker("worker2")
-    await asyncio.sleep(15)
+    await asyncio.sleep(15.5)
 
     worker1_messages = await worker1_client.GetMessages(
         worker_messages_pb2.GetMessagesRequest()
@@ -240,7 +240,7 @@ async def test_message_secondary_blocked_waiting_on_quorum_other_client_working(
         )
 
     blocking_message_task = asyncio.create_task(send_message())
-    await asyncio.sleep(15)  # wait till node would be in read-only
+    await asyncio.sleep(15.5)  # wait till node would be in read-only
 
     follow_up_response = await master_client.PostMessage(
         master_messages_pb2.PostMessageRequest(

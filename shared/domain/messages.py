@@ -18,7 +18,6 @@ class Message:
     sequence_number: int
     parent_id: str
     timestamp: float
-    status: MessageStatus
     status: MessageStatus = MessageStatus.PENDING
     signature: str | None = None
     client_id: str | None = None

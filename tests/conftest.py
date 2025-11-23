@@ -53,27 +53,13 @@ def docker_master():
     subprocess.run(
         ["docker-compose", "up", "--build", "-d", master], check=True, cwd="."
     )
+    time.sleep(3)
     wait_for_service("localhost", 50052, timeout=60)
     logger.info("Master service ready")
     yield
 
     logger.info("Shutting down master containers...")
     subprocess.run(["docker-compose", "down", master], check=True, cwd=".")
-
-
-@pytest.fixture(scope="function")
-def docker_worker_1():
-    logger.info("Starting worker 1 containers...")
-    worker1 = "worker1"
-    subprocess.run(
-        ["docker-compose", "up", "--build", "-d", worker1], check=True, cwd="."
-    )
-    logger.info(f"Waiting for worker service {worker1}...")
-    wait_for_service("localhost", 50053, timeout=60)
-    yield
-
-    logger.info(f"Shutting down worker {worker1} container...")
-    subprocess.run(["docker-compose", "down", worker1], check=True, cwd=".")
 
 
 def start_worker(worker_id: str):
@@ -98,6 +84,24 @@ def stop_worker(worker_id: str):
     """Utility function to stop a worker container"""
     logger.info(f"Shutting down worker {worker_id} container...")
     subprocess.run(["docker-compose", "stop", worker_id], check=False, cwd=".")
+
+
+def pause_worker(worker_id: str):
+    """Utility function to pause a worker container (keeps RAM/state)"""
+    logger.info(f"Pausing worker {worker_id} container...")
+    subprocess.run(
+        ["docker", "pause", f"distributes-systems-{worker_id}-1"], check=True, cwd="."
+    )
+    logger.info(f"Worker {worker_id} paused")
+
+
+def unpause_worker(worker_id: str):
+    """Utility function to unpause a worker container"""
+    logger.info(f"Unpausing worker {worker_id} container...")
+    subprocess.run(
+        ["docker", "unpause", f"distributes-systems-{worker_id}-1"], check=True, cwd="."
+    )
+    logger.info(f"Worker {worker_id} unpaused")
 
 
 @pytest.fixture(scope="function")
@@ -128,6 +132,10 @@ def wait_for_service(host: str, port: int, timeout: int = 60):
     start = time.time()
     while time.time() - start < timeout:
         if check_grpc_ready(host, port):
+            logger.info(
+                f"Service {host}:{port} accepting connections, waiting for stabilization..."
+            )
+            time.sleep(3)  # Extra buffer to ensure internal services are ready
             return True
         time.sleep(2)
     raise TimeoutError(f"Service {host}:{port} not ready after {timeout}s")

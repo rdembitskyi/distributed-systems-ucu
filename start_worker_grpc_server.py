@@ -7,13 +7,17 @@ import argparse
 import logging
 import signal
 import sys
+import os
 from secondary_worker.transport.grpc_transport import GrpcTransport
 
 
-# Configure logging
+# Get worker ID from environment
+WORKER_ID = os.getenv("MACHINE_ID", "unknown")
+
+# Configure logging with worker ID
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - [%(filename)s:%(lineno)d] - %(levelname)s - %(message)s",
+    format=f"%(asctime)s - WORKER[{WORKER_ID}] - %(name)s - [%(filename)s:%(lineno)d] - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(sys.stdout),
         logging.FileHandler("/app/logs/worker.log"),

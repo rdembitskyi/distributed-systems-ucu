@@ -50,6 +50,12 @@ class MessageServiceStub(object):
             response_deserializer=master__messages__pb2.GetMessagesResponse.FromString,
             _registered_method=True,
         )
+        self.CatchUp = channel.unary_unary(
+            "/messages.MessageService/CatchUp",
+            request_serializer=master__messages__pb2.CatchUpRequest.SerializeToString,
+            response_deserializer=master__messages__pb2.CatchUpResponse.FromString,
+            _registered_method=True,
+        )
 
 
 class MessageServiceServicer(object):
@@ -67,6 +73,12 @@ class MessageServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def CatchUp(self, request, context):
+        """sync with master"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
 
 def add_MessageServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -79,6 +91,11 @@ def add_MessageServiceServicer_to_server(servicer, server):
             servicer.GetMessages,
             request_deserializer=master__messages__pb2.GetMessagesRequest.FromString,
             response_serializer=master__messages__pb2.GetMessagesResponse.SerializeToString,
+        ),
+        "CatchUp": grpc.unary_unary_rpc_method_handler(
+            servicer.CatchUp,
+            request_deserializer=master__messages__pb2.CatchUpRequest.FromString,
+            response_serializer=master__messages__pb2.CatchUpResponse.SerializeToString,
         ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -143,6 +160,36 @@ class MessageService(object):
             "/messages.MessageService/GetMessages",
             master__messages__pb2.GetMessagesRequest.SerializeToString,
             master__messages__pb2.GetMessagesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True,
+        )
+
+    @staticmethod
+    def CatchUp(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/messages.MessageService/CatchUp",
+            master__messages__pb2.CatchUpRequest.SerializeToString,
+            master__messages__pb2.CatchUpResponse.FromString,
             options,
             channel_credentials,
             insecure,

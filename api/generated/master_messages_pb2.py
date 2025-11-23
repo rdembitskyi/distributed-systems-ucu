@@ -20,7 +20,7 @@ _sym_db = _symbol_database.Default()
 
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n\x15master_messages.proto\x12\x08messages"O\n\x12PostMessageRequest\x12\x0f\n\x07\x63ontent\x18\x01 \x01(\t\x12\x15\n\rwrite_concern\x18\x02 \x01(\x05\x12\x11\n\tclient_id\x18\x03 \x01(\t"m\n\x07Message\x12\x12\n\nmessage_id\x18\x01 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x02 \x01(\t\x12\x17\n\x0fsequence_number\x18\x03 \x01(\x05\x12\x11\n\tparent_id\x18\x04 \x01(\t\x12\x11\n\ttimestamp\x18\x05 \x01(\x01"N\n\x13PostMessageResponse\x12\x0e\n\x06status\x18\x01 \x01(\t\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\x16\n\x0etotal_messages\x18\x03 \x01(\x05"\x14\n\x12GetMessagesRequest":\n\x13GetMessagesResponse\x12#\n\x08messages\x18\x01 \x03(\x0b\x32\x11.messages.Message2\xa8\x01\n\x0eMessageService\x12J\n\x0bPostMessage\x12\x1c.messages.PostMessageRequest\x1a\x1d.messages.PostMessageResponse\x12J\n\x0bGetMessages\x12\x1c.messages.GetMessagesRequest\x1a\x1d.messages.GetMessagesResponseb\x06proto3'
+    b'\n\x15master_messages.proto\x12\x08messages"O\n\x12PostMessageRequest\x12\x0f\n\x07\x63ontent\x18\x01 \x01(\t\x12\x15\n\rwrite_concern\x18\x02 \x01(\x05\x12\x11\n\tclient_id\x18\x03 \x01(\t"m\n\x07Message\x12\x12\n\nmessage_id\x18\x01 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x02 \x01(\t\x12\x17\n\x0fsequence_number\x18\x03 \x01(\x05\x12\x11\n\tparent_id\x18\x04 \x01(\t\x12\x11\n\ttimestamp\x18\x05 \x01(\x01"\x86\x01\n\rSignedMessage\x12\x12\n\nmessage_id\x18\x01 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x02 \x01(\t\x12\x17\n\x0fsequence_number\x18\x03 \x01(\x05\x12\x11\n\tparent_id\x18\x04 \x01(\t\x12\x11\n\ttimestamp\x18\x05 \x01(\x01\x12\x11\n\tsignature\x18\x06 \x01(\t"N\n\x13PostMessageResponse\x12\x0e\n\x06status\x18\x01 \x01(\t\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\x16\n\x0etotal_messages\x18\x03 \x01(\x05"\x14\n\x12GetMessagesRequest":\n\x13GetMessagesResponse\x12#\n\x08messages\x18\x01 \x03(\x0b\x32\x11.messages.Message"B\n\x0e\x43\x61tchUpRequest\x12\x1c\n\x14last_sequence_number\x18\x01 \x01(\x05\x12\x12\n\nauth_token\x18\x02 \x01(\t"L\n\x0f\x43\x61tchUpResponse\x12\x0e\n\x06status\x18\x01 \x01(\t\x12)\n\x08messages\x18\x02 \x03(\x0b\x32\x17.messages.SignedMessage2\xe8\x01\n\x0eMessageService\x12J\n\x0bPostMessage\x12\x1c.messages.PostMessageRequest\x1a\x1d.messages.PostMessageResponse\x12J\n\x0bGetMessages\x12\x1c.messages.GetMessagesRequest\x1a\x1d.messages.GetMessagesResponse\x12>\n\x07\x43\x61tchUp\x12\x18.messages.CatchUpRequest\x1a\x19.messages.CatchUpResponseb\x06proto3'
 )
 
 _globals = globals()
@@ -32,12 +32,18 @@ if not _descriptor._USE_C_DESCRIPTORS:
     _globals["_POSTMESSAGEREQUEST"]._serialized_end = 114
     _globals["_MESSAGE"]._serialized_start = 116
     _globals["_MESSAGE"]._serialized_end = 225
-    _globals["_POSTMESSAGERESPONSE"]._serialized_start = 227
-    _globals["_POSTMESSAGERESPONSE"]._serialized_end = 305
-    _globals["_GETMESSAGESREQUEST"]._serialized_start = 307
-    _globals["_GETMESSAGESREQUEST"]._serialized_end = 327
-    _globals["_GETMESSAGESRESPONSE"]._serialized_start = 329
-    _globals["_GETMESSAGESRESPONSE"]._serialized_end = 387
-    _globals["_MESSAGESERVICE"]._serialized_start = 390
-    _globals["_MESSAGESERVICE"]._serialized_end = 558
+    _globals["_SIGNEDMESSAGE"]._serialized_start = 228
+    _globals["_SIGNEDMESSAGE"]._serialized_end = 362
+    _globals["_POSTMESSAGERESPONSE"]._serialized_start = 364
+    _globals["_POSTMESSAGERESPONSE"]._serialized_end = 442
+    _globals["_GETMESSAGESREQUEST"]._serialized_start = 444
+    _globals["_GETMESSAGESREQUEST"]._serialized_end = 464
+    _globals["_GETMESSAGESRESPONSE"]._serialized_start = 466
+    _globals["_GETMESSAGESRESPONSE"]._serialized_end = 524
+    _globals["_CATCHUPREQUEST"]._serialized_start = 526
+    _globals["_CATCHUPREQUEST"]._serialized_end = 592
+    _globals["_CATCHUPRESPONSE"]._serialized_start = 594
+    _globals["_CATCHUPRESPONSE"]._serialized_end = 670
+    _globals["_MESSAGESERVICE"]._serialized_start = 673
+    _globals["_MESSAGESERVICE"]._serialized_end = 905
 # @@protoc_insertion_point(module_scope)

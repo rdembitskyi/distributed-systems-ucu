@@ -23,7 +23,9 @@ class RetryPolicy:
                 max_attempts=10, base_delay=2.0, max_delay=30.0
             ),
             WorkerHealthState.UNHEALTHY: RetryPolicy(
-                max_attempts=20, base_delay=10.0, max_delay=60.0
+                max_attempts=0,  # No point to try on dead node, node would request re-sync after coming online.
+                base_delay=30.0,
+                max_delay=180.0,
             ),
         }
         return policies[state]

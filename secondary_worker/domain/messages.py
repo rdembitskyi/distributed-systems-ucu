@@ -28,3 +28,8 @@ class MasterHealthCheckRequest:
 @dataclass
 class MasterHealthCheckResponse:
     status: str
+
+
+@dataclass
+class RecoveryNotification:
+    status: str

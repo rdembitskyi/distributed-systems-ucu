@@ -7,6 +7,7 @@ from secondary_worker.domain.messages import (
     Message,
     MasterMessageReplicaResponse,
     MasterHealthCheckResponse,
+    RecoveryNotification,
 )
 from shared.security.auth import validate_auth_token
 from shared.domain.status_codes import StatusCodes
@@ -15,6 +16,7 @@ from secondary_worker.services.replica_message_validation.replica_validation imp
 )
 
 from shared.storage.factory import get_messages_storage
+from secondary_worker.services.sync_service import WorkerSyncService
 
 
 logger = logging.getLogger(__name__)
@@ -26,6 +28,8 @@ class GrpcTransport(SecondaryTransportInterface):
     def __init__(self):
         self._store = get_messages_storage()
         self._fail_next_n_attempts = 0
+        self._fail_after_db_save = False
+        self._worker_sync_service = WorkerSyncService()
 
     def should_fail(self) -> bool:
         return self._fail_next_n_attempts > 0
@@ -33,9 +37,13 @@ class GrpcTransport(SecondaryTransportInterface):
     def consume_failure(self):
         self._fail_next_n_attempts -= 1
 
-    async def inject_failure(self, attempts: int):
+    def should_fail_after_db_save(self):
+        return self._fail_after_db_save
+
+    async def inject_failure(self, attempts: int, where: str):
         """Inject failure information"""
         self._fail_next_n_attempts = attempts
+        self._fail_after_db_save = where == "after_db_save"
 
     async def get_messages(self) -> list[str]:
         """Return all messages from the in-memory list"""
@@ -92,6 +100,19 @@ class GrpcTransport(SecondaryTransportInterface):
         logger.info("Replica: Reporting health status")
         return MasterHealthCheckResponse(status="healthy")
 
+    async def handle_recovery(self, master_latest_sequence: int):
+        latest = self._store.get_latest()
+        worker_latest_sequence = latest.sequence_number if latest else 0
+        if worker_latest_sequence < master_latest_sequence:
+            logger.info(
+                f"Recovery: worker last number {worker_latest_sequence} is smaller than master latest number {master_latest_sequence}"
+            )
+            result = await self._worker_sync_service.request_catchup()
+            status = "synced" if result else "failed"
+            return RecoveryNotification(status=status)
+        else:
+            return RecoveryNotification(status="synced")
+
     async def start_server(self, port: int = 50052):
         """Start the async gRPC server for secondary worker"""
         self._server = aio.server()
@@ -140,7 +161,10 @@ class GrpcSecondaryServicer(worker_messages_pb2_grpc.SecondaryWorkerServiceServi
         """Handle message reception from master"""
         logger.info(f"Replica: Received replication message request: {request.message}")
 
-        if self.transport.should_fail() > 0:
+        if (
+            self.transport.should_fail() > 0
+            and not self.transport.should_fail_after_db_save()
+        ):
             self.transport.consume_failure()
             logger.warning("Injected failure - throwing exception")
             raise Exception("Injected failure for testing")
@@ -161,6 +185,14 @@ class GrpcSecondaryServicer(worker_messages_pb2_grpc.SecondaryWorkerServiceServi
             message=message, master_token=master_token
         )
 
+        if (
+            self.transport.should_fail() > 0
+            and self.transport.should_fail_after_db_save()
+        ):
+            self.transport.consume_failure()
+            logger.warning("Injected failure - throwing exception after save to db")
+            raise Exception("Injected failure after save to db for testing")
+
         # Return response
         return worker_messages_pb2.MasterMessageReplicaResponse(
             status=result.status,
@@ -178,5 +210,14 @@ class GrpcSecondaryServicer(worker_messages_pb2_grpc.SecondaryWorkerServiceServi
 
     async def InjectFailure(self, request, context):
         logger.info(f"Replica: Received injection failure request: {request}")
-        await self.transport.inject_failure(request.fail_next_n_requests)
+        await self.transport.inject_failure(
+            attempts=request.fail_next_n_requests, where=request.where
+        )
         return worker_messages_pb2.InjectFailureResponse(status=True)
+
+    async def HandleRecovery(self, request, context):
+        logger.info(f"Replica: Received notification recovery request: {request}")
+        result = await self.transport.handle_recovery(
+            master_latest_sequence=request.master_latest_sequence
+        )
+        return worker_messages_pb2.RecoveryAcknowledgment(status=result.status)
