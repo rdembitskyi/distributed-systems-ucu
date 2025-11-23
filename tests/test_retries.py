@@ -4,10 +4,15 @@ Integration tests for retries (Iteration 3)
 Tests verify:
 """
 
-import pytest
 import asyncio
 import time
+
+import pytest
+
 from api.generated import master_messages_pb2, worker_messages_pb2
+from shared.domain.response import ResponseStatus
+
+from .conftest import return_timeout
 
 
 @pytest.mark.integration
@@ -45,7 +50,9 @@ async def test_message_delivery_failed_write_3(
     duration = time.time() - start_time
 
     # Then: Should eventually succeed after retries
-    assert response.status == "success", f"Expected success but got: {response.status}"
+    assert response.status == ResponseStatus.SUCCESS, (
+        f"Expected success but got: {response.status}"
+    )
 
     # Should take longer than normal due to retries (at least base_delay * 2)
     # Normal would be ~5s (worker delay), with retries should be ~6-7s
@@ -109,7 +116,9 @@ async def test_message_delivery_failed_write_2(
     duration = time.time() - start_time
 
     # Then: Should eventually succeed after retries
-    assert response.status == "success", f"Expected success but got: {response.status}"
+    assert response.status == ResponseStatus.SUCCESS, (
+        f"Expected success but got: {response.status}"
+    )
 
     # Verify that we got response that master and worker 2 got the message, but for worker 1 we still retry
     worker1_messages = await worker1_client.GetMessages(
@@ -180,7 +189,7 @@ async def test_message_secondary_blocked_waiting_on_quorum(
         )
 
     blocking_message_task = asyncio.create_task(send_message())
-    await asyncio.sleep(15.5)  # wait till node would be in read-only
+    await asyncio.sleep(return_timeout())  # wait till node would be in read-only
 
     follow_up_response = await master_client.PostMessage(
         master_messages_pb2.PostMessageRequest(
@@ -188,7 +197,7 @@ async def test_message_secondary_blocked_waiting_on_quorum(
         )
     )
 
-    assert follow_up_response.status == "failure"
+    assert follow_up_response.status == ResponseStatus.ERROR
     assert (
         follow_up_response.message
         == "Service temporarily unavailable for writes (quorum lost)"
@@ -196,7 +205,7 @@ async def test_message_secondary_blocked_waiting_on_quorum(
 
     # Now start worker2 to restore quorum
     start_worker("worker2")
-    await asyncio.sleep(15.5)
+    await asyncio.sleep(return_timeout())
 
     worker1_messages = await worker1_client.GetMessages(
         worker_messages_pb2.GetMessagesRequest()
@@ -240,7 +249,7 @@ async def test_message_secondary_blocked_waiting_on_quorum_other_client_working(
         )
 
     blocking_message_task = asyncio.create_task(send_message())
-    await asyncio.sleep(15.5)  # wait till node would be in read-only
+    await asyncio.sleep(return_timeout())  # wait till node would be in read-only
 
     follow_up_response = await master_client.PostMessage(
         master_messages_pb2.PostMessageRequest(
@@ -248,7 +257,7 @@ async def test_message_secondary_blocked_waiting_on_quorum_other_client_working(
         )
     )
     # client is blocked - no quorum for previous message
-    assert follow_up_response.status == "failure"
+    assert follow_up_response.status == ResponseStatus.ERROR
     assert (
         follow_up_response.message
         == "Service temporarily unavailable for writes (quorum lost)"
@@ -260,7 +269,7 @@ async def test_message_secondary_blocked_waiting_on_quorum_other_client_working(
             content="another one", write_concern=write_concern - 1, client_id="client_2"
         )
     )
-    assert other_client_response.status == "success"
+    assert other_client_response.status == ResponseStatus.SUCCESS
 
     # Then verify messages in first worker - from both clients
     worker1_messages = await worker1_client.GetMessages(

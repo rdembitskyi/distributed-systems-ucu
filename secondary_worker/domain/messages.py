@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+
 from shared.domain.messages import Message
 from shared.domain.worker import WorkerHealthState
 

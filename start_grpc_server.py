@@ -1,9 +1,11 @@
 import asyncio
-import os
-import sys
-import signal
 import logging
+import os
+import signal
+import sys
+
 from master.transport.grpc_transport import GrpcTransport
+
 
 # Configure logging
 logging.basicConfig(

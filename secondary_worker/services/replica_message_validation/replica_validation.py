@@ -1,14 +1,16 @@
 import logging
-from shared.security.message_signer import FernetMessageSigner
-from shared.domain.messages import Message
+
 from secondary_worker.domain.validation import ValidationResult
-from shared.storage.factory import get_messages_storage
 from secondary_worker.services.replica_message_validation.exceptions import (
-    InvalidSignatureError,
+    DuplicateMessageError,
     InvalidParentIdError,
     InvalidSequenceNumberError,
-    DuplicateMessageError,
+    InvalidSignatureError,
 )
+from shared.domain.messages import Message
+from shared.security.message_signer import FernetMessageSigner
+from shared.storage.factory import get_messages_storage
+
 
 # Validation error constants
 INVALID_SIGNATURE_ERROR_MESSAGE = (

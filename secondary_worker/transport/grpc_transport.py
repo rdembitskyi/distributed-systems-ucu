@@ -1,22 +1,24 @@
-import logging
 import asyncio
+import logging
+
 from grpc import aio
-from secondary_worker.transport.interface import SecondaryTransportInterface
+
 from api.generated import worker_messages_pb2, worker_messages_pb2_grpc
 from secondary_worker.domain.messages import (
-    Message,
-    MasterMessageReplicaResponse,
     MasterHealthCheckResponse,
+    MasterMessageReplicaResponse,
+    Message,
     RecoveryNotification,
 )
-from shared.security.auth import validate_auth_token
-from shared.domain.status_codes import StatusCodes
 from secondary_worker.services.replica_message_validation.replica_validation import (
     validate_message,
 )
-
-from shared.storage.factory import get_messages_storage
 from secondary_worker.services.sync_service import WorkerSyncService
+from secondary_worker.transport.interface import SecondaryTransportInterface
+from shared.domain.response import HealthStatus, ResponseStatus, SyncStatus
+from shared.domain.status_codes import StatusCodes
+from shared.security.auth import validate_auth_token
+from shared.storage.factory import get_messages_storage
 
 
 logger = logging.getLogger(__name__)
@@ -59,7 +61,7 @@ class GrpcTransport(SecondaryTransportInterface):
         if not validate_auth_token(token=master_token):
             logger.error("Replica: Invalid auth token from master")
             return MasterMessageReplicaResponse(
-                status="error",
+                status=ResponseStatus.ERROR,
                 status_code=StatusCodes.UNAUTHORIZED.value,
                 error_message="Invalid auth token",
             )
@@ -70,14 +72,14 @@ class GrpcTransport(SecondaryTransportInterface):
                 f"Replica: Message validation failed: {message} with error: {validation_result.error}"
             )
             return MasterMessageReplicaResponse(
-                status="error",
+                status=ResponseStatus.ERROR,
                 status_code=StatusCodes.BAD_REQUEST.value,
                 error_message=validation_result.error,
             )
         if validation_result.is_duplicated:
             logger.error(f"Replica: Duplicated message received: {message}")
             return MasterMessageReplicaResponse(
-                status="error",
+                status=ResponseStatus.ERROR,
                 status_code=StatusCodes.DUPLICATE_RECEIVED.value,
                 error_message="Duplicated message",
             )
@@ -87,18 +89,20 @@ class GrpcTransport(SecondaryTransportInterface):
         if not result:
             logger.error("Replica: Failed to add message to the store")
             return MasterMessageReplicaResponse(
-                status="error",
+                status=ResponseStatus.ERROR,
                 status_code=StatusCodes.INTERNAL_SERVER_ERROR.value,
                 error_message="Failed to add message to the store",
             )
         return MasterMessageReplicaResponse(
-            status="success", status_code=StatusCodes.OK.value, error_message=None
+            status=ResponseStatus.SUCCESS,
+            status_code=StatusCodes.OK.value,
+            error_message=None,
         )
 
     async def report_health(self) -> MasterHealthCheckResponse:
         """Report health status to master"""
         logger.info("Replica: Reporting health status")
-        return MasterHealthCheckResponse(status="healthy")
+        return MasterHealthCheckResponse(status=HealthStatus.HEALTHY)
 
     async def handle_recovery(self, master_latest_sequence: int):
         latest = self._store.get_latest()
@@ -108,10 +112,11 @@ class GrpcTransport(SecondaryTransportInterface):
                 f"Recovery: worker last number {worker_latest_sequence} is smaller than master latest number {master_latest_sequence}"
             )
             result = await self._worker_sync_service.request_catchup()
-            status = "synced" if result else "failed"
+            status = SyncStatus.SYNCED if result else SyncStatus.FAILED
             return RecoveryNotification(status=status)
         else:
-            return RecoveryNotification(status="synced")
+            # we don't need any new messages
+            return RecoveryNotification(status=SyncStatus.SYNCED)
 
     async def start_server(self, port: int = 50052):
         """Start the async gRPC server for secondary worker"""
@@ -204,9 +209,9 @@ class GrpcSecondaryServicer(worker_messages_pb2_grpc.SecondaryWorkerServiceServi
         """Handle health check requests from master"""
         logger.info(f"Replica: Received health check request: {request}")
 
-        await self.transport.report_health()
+        result = await self.transport.report_health()
 
-        return worker_messages_pb2.MasterHealthCheckResponse(status="healthy")
+        return worker_messages_pb2.MasterHealthCheckResponse(status=result.status)
 
     async def InjectFailure(self, request, context):
         logger.info(f"Replica: Received injection failure request: {request}")

@@ -1,4 +1,5 @@
 import logging
+
 from shared.utils.singleton import singleton
 
 

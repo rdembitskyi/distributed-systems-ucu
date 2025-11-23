@@ -7,9 +7,13 @@ Tests verify:
 - System maintains idempotency when receiving same message multiple times
 """
 
-import pytest
 import asyncio
+
+import pytest
+
 from api.generated import master_messages_pb2, worker_messages_pb2
+
+from .conftest import return_timeout
 
 
 @pytest.mark.integration
@@ -40,7 +44,7 @@ async def test_duplicate_message_rejection(
     asyncio.create_task(send_message(message="message_2"))
     asyncio.create_task(send_message(message="message_3"))
 
-    await asyncio.sleep(15.5)
+    await asyncio.sleep(return_timeout())
 
     # verify no duplication
     worker1_messages = await worker1_client.GetMessages(

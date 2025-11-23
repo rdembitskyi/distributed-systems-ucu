@@ -1,6 +1,7 @@
-import logging
 from collections import OrderedDict
+import logging
 from typing import Dict, List, Optional
+
 from shared.domain.messages import Message, MessageStatus
 from shared.storage.interface import MessageStoreInterface
 from shared.utils.singleton import singleton

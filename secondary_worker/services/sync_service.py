@@ -1,13 +1,18 @@
-import logging
 import asyncio
+import logging
+
 from grpc import aio
+
 from api.generated import master_messages_pb2, master_messages_pb2_grpc
-from shared.storage.factory import get_messages_storage
-from shared.security.auth import get_auth_token
+from secondary_worker.domain.messages import Message
 from secondary_worker.services.replica_message_validation.replica_validation import (
     validate_message,
 )
-from secondary_worker.domain.messages import Message
+from shared.domain.constants import NO_MESSAGES
+from shared.domain.response import ResponseStatus
+from shared.security.auth import get_auth_token
+from shared.storage.factory import get_messages_storage
+
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +43,9 @@ class WorkerSyncService:
             storage = get_messages_storage()
             worker_latest_message = storage.get_latest()
             worker_last_seq = (
-                worker_latest_message.sequence_number if worker_latest_message else 0
+                worker_latest_message.sequence_number
+                if worker_latest_message
+                else NO_MESSAGES
             )
 
             logger.info(f"Requesting sync: Worker last sequence: {worker_last_seq}")
@@ -55,7 +62,7 @@ class WorkerSyncService:
                 self._master_client.CatchUp(request), timeout=30.0
             )
 
-            if response.status != "success":
+            if response.status != ResponseStatus.SUCCESS:
                 logger.error(
                     f"Replica sync: Catch-up request failed: {response.error_message}"
                 )

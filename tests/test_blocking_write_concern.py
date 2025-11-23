@@ -6,10 +6,12 @@ Tests verify:
 """
 
 import logging
-import pytest
 import time
 
+import pytest
+
 from api.generated import master_messages_pb2, worker_messages_pb2
+from shared.domain.response import ResponseStatus
 
 
 logger = logging.getLogger(__name__)
@@ -43,7 +45,9 @@ async def test_write_concern_3_blocks_until_all_workers_ack(
     duration = end_time - start_time
 
     # Then: Request should succeed
-    assert response.status == "success", f"Expected success, got: {response.status}"
+    assert response.status == ResponseStatus.SUCCESS, (
+        f"Expected success, got: {response.status}"
+    )
     assert response.message == "Message added successfully"
 
     # Should wait approximately 5 seconds (worker delay)
@@ -93,7 +97,7 @@ async def test_write_concern_3_total_ordering(
                 content=content, write_concern=3, client_id="random"
             )
         )
-        assert response.status == "success"
+        assert response.status == ResponseStatus.SUCCESS
         sent_messages.append(content)
 
     # Master should have all messages in order
@@ -146,7 +150,7 @@ async def test_write_concern_3_parent_child_relationships(
                 content=f"Message {i + 1}", write_concern=3, client_id="random"
             )
         )
-        assert response.status == "success"
+        assert response.status == ResponseStatus.SUCCESS
 
     # Then: Verify parent-child relationships on master
     master_messages = await master_client.GetMessages(

@@ -1,34 +1,41 @@
-import logging
 import asyncio
-from typing import List, Dict
-from shared.domain.worker import Worker
-from shared.domain.replication import ReplicationResult
+import logging
+import os
+from typing import Dict, List
+
 from grpc import aio
-from shared.domain.messages import Message, MessageStatus
-from shared.domain.status_codes import StatusCodes
+
 from api.generated import worker_messages_pb2, worker_messages_pb2_grpc
-from shared.security.auth import get_auth_token
-from secondary_worker.domain.messages import MasterMessageReplicaResponse
+from master.config import get_workers_registry
+from master.services.heartbeat import HeartBeatService
 from master.services.replication_coordinator import (
     handle_replication_response_from_workers,
 )
-from shared.storage.factory import get_messages_storage
-from master.services.write_controller import manage_write_availability
 from master.services.retry_policy import RetryPolicy
-from master.services.heartbeat import HeartBeatService
-from shared.utils.concurrency import wait_for_quorum, QuorumNotReached
+from master.services.write_controller import manage_write_availability
+from secondary_worker.domain.messages import MasterMessageReplicaResponse
+from shared.domain.constants import NO_MESSAGES
+from shared.domain.messages import Message, MessageStatus
+from shared.domain.replication import ReplicationResult
+from shared.domain.response import HealthStatus
+from shared.domain.status_codes import StatusCodes
+from shared.domain.worker import Worker
+from shared.security.auth import get_auth_token
+from shared.storage.factory import get_messages_storage
+from shared.utils.concurrency import QuorumNotReached, wait_for_quorum
+
 
 logger = logging.getLogger(__name__)
-WORKERS_REGISTRY = [
-    Worker(worker_id="worker1", address="worker1", port=50053),
-    Worker(worker_id="worker2", address="worker2", port=50054),
-]
+
+
+WORKERS_REGISTRY = get_workers_registry()
+REPLICATION_TIMEOUT = float(os.environ.get("REPLICATION_TIMEOUT"))
 
 
 class WorkersService:
     """Service to manage secondary workers and handle replication"""
 
-    def __init__(self, replication_timeout: float = 15.0):
+    def __init__(self, replication_timeout: float = REPLICATION_TIMEOUT):
         self.replication_timeout = replication_timeout
         self.workers: Dict[str, Worker] = {}
         self.worker_clients: Dict[
@@ -59,7 +66,7 @@ class WorkersService:
 
     async def replicate_message_to_workers(
         self, message: Message, write_concern: int
-    ) -> ReplicationResult:
+    ) -> ReplicationResult | None:
         """
         Replicate message to active workers.
         Returns success only if quorum of workers acknowledge.
@@ -233,7 +240,7 @@ class WorkersService:
 
             response = await asyncio.wait_for(client.ReportHealth(request), timeout=2.0)
 
-            return response.status == "healthy"
+            return response.status == HealthStatus.HEALTHY
 
         except Exception as e:
             logger.warning(f"Health check failed for worker {worker_id}: {e}")
@@ -343,7 +350,9 @@ class WorkersService:
         storage = get_messages_storage()
         last_message = storage.get_latest()
         auth_token = get_auth_token()
-        master_latest_sequence = last_message.sequence_number if last_message else 0
+        master_latest_sequence = (
+            last_message.sequence_number if last_message else NO_MESSAGES
+        )
         request = worker_messages_pb2.RecoveryNotification(
             master_latest_sequence=master_latest_sequence, auth_token=auth_token
         )

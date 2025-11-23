@@ -1,6 +1,11 @@
-import pytest
 import asyncio
+
+import pytest
+
 from api.generated import master_messages_pb2, worker_messages_pb2
+from shared.domain.response import ResponseStatus
+
+from .conftest import return_timeout
 
 
 @pytest.mark.integration
@@ -18,7 +23,7 @@ async def test_self_acceptance_test(
             content="message 1", write_concern=1, client_id="client_1"
         )
     )
-    assert response.status == "success"
+    assert response.status == ResponseStatus.SUCCESS
 
     # send(Msg2, W=2) - Ok
     response = await master_client.PostMessage(
@@ -26,7 +31,7 @@ async def test_self_acceptance_test(
             content="message 2", write_concern=2, client_id="client_1"
         )
     )
-    assert response.status == "success"
+    assert response.status == ResponseStatus.SUCCESS
 
     # send(Msg3, W=3) - Wait
     async def send_blocking_message(message):
@@ -45,11 +50,11 @@ async def test_self_acceptance_test(
             content="message 4", write_concern=1, client_id="client_2"
         )
     )
-    assert response.status == "success"
+    assert response.status == ResponseStatus.SUCCESS
 
     # Start S2
     start_worker("worker2")
-    await asyncio.sleep(25.5)
+    await asyncio.sleep(return_timeout())
 
     # verify master messages
     master_messages = await master_client.GetMessages(

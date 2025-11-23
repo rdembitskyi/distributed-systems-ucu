@@ -1,14 +1,16 @@
-import logging
 import asyncio
+import logging
+
 import grpc
 
 # Import the gRPC generated stubs
 from api.generated import (
     master_messages_pb2,
     master_messages_pb2_grpc,
-    worker_messages_pb2_grpc,
     worker_messages_pb2,
+    worker_messages_pb2_grpc,
 )
+
 
 logger = logging.getLogger(__name__)
 SERVER_ADDRESS = "localhost:50052"

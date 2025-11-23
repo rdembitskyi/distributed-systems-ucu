@@ -8,10 +8,13 @@ Tests verify:
 - Eventual consistency across all nodes
 """
 
-import pytest
 import asyncio
 import time
+
+import pytest
+
 from api.generated import master_messages_pb2, worker_messages_pb2
+from shared.domain.response import ResponseStatus
 
 
 @pytest.mark.integration
@@ -44,7 +47,7 @@ async def test_write_concern_1_immediate_response_eventual_consistency(
     duration = end_time - start_time
 
     # Then: Request should succeed immediately (< 1 second)
-    assert response.status == "success"
+    assert response.status == ResponseStatus.SUCCESS
     assert duration < 1.0, (
         f"Expected immediate response with w=1, but took {duration:.2f}s. w=1 should not wait for workers."
     )
@@ -112,7 +115,7 @@ async def test_write_concern_1_multiple_messages_eventual_consistency(
                 content=content, write_concern=1, client_id="random"
             )
         )
-        assert response.status == "success"
+        assert response.status == ResponseStatus.SUCCESS
         sent_messages.append(content)
 
     duration = time.time() - start_time
@@ -163,7 +166,7 @@ async def test_write_concern_1_vs_3_timing_difference(docker_services, master_cl
     )
     w1_duration = time.time() - start
 
-    assert response1.status == "success"
+    assert response1.status == ResponseStatus.SUCCESS
     assert w1_duration < 1.0
     print(f"✅ w=1 took {w1_duration:.2f}s (fast)")
 
@@ -176,7 +179,7 @@ async def test_write_concern_1_vs_3_timing_difference(docker_services, master_cl
     )
     w3_duration = time.time() - start
 
-    assert response3.status == "success"
+    assert response3.status == ResponseStatus.SUCCESS
     assert 4.0 <= w3_duration <= 10.0
     print(f"✅ w=3 took {w3_duration:.2f}s (blocked on workers)")
 

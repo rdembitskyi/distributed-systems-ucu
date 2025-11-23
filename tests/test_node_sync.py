@@ -4,10 +4,13 @@ Integration tests for node sync (Iteration 3)
 Tests verify:
 """
 
-import pytest
 import asyncio
-from .conftest import pause_worker, unpause_worker
+
+import pytest
+
 from api.generated import master_messages_pb2, worker_messages_pb2
+
+from .conftest import pause_worker, return_timeout, unpause_worker
 
 
 @pytest.mark.integration
@@ -34,7 +37,7 @@ async def test_node_sync_after_being_turned_on(
     asyncio.create_task(send_message("test_2"))
 
     start_worker("worker2")
-    await asyncio.sleep(15.5)
+    await asyncio.sleep(return_timeout())
 
     worker1_messages = await worker1_client.GetMessages(
         worker_messages_pb2.GetMessagesRequest()
@@ -81,7 +84,7 @@ async def test_node_sync_after_node_sleep(
         asyncio.create_task(send_message("test_" + str(i)))
 
     unpause_worker("worker2")
-    await asyncio.sleep(15.5)
+    await asyncio.sleep(return_timeout())
 
     worker2_messages = await worker2_client.GetMessages(
         worker_messages_pb2.GetMessagesRequest()

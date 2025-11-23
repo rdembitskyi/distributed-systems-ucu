@@ -1,12 +1,12 @@
 import asyncio
-import logging
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+import logging
+from typing import Awaitable, Callable, Dict, List
 
 from shared.domain.worker import Worker, WorkerHealthState
-from typing import Dict, List, Callable, Awaitable
 
 
 logger = logging.getLogger(__name__)

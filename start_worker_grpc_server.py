@@ -2,12 +2,13 @@
 gRPC server startup script for Secondary Worker
 """
 
-import asyncio
 import argparse
+import asyncio
 import logging
+import os
 import signal
 import sys
-import os
+
 from secondary_worker.transport.grpc_transport import GrpcTransport
 
 

@@ -3,12 +3,13 @@ Shared pytest fixtures for integration tests
 """
 
 import logging
-import pytest
-import grpc
 import subprocess
 import time
-from api.generated import master_messages_pb2_grpc
-from api.generated import worker_messages_pb2_grpc
+
+import grpc
+import pytest
+
+from api.generated import master_messages_pb2_grpc, worker_messages_pb2_grpc
 
 
 logger = logging.getLogger(__name__)
@@ -184,3 +185,7 @@ async def worker2_client():
 
     async with grpc.aio.insecure_channel("localhost:50054") as channel:
         yield worker_messages_pb2_grpc.SecondaryWorkerServiceStub(channel)
+
+
+def return_timeout():
+    return 15.5

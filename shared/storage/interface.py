@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
+
 from shared.domain.messages import Message
 
 

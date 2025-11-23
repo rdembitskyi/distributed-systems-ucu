@@ -1,7 +1,9 @@
 import logging
+
+from secondary_worker.domain.messages import MasterMessageReplicaResponse
 from shared.domain.replication import ReplicationResult
 from shared.domain.status_codes import StatusCodes
-from secondary_worker.domain.messages import MasterMessageReplicaResponse
+
 
 logger = logging.getLogger(__name__)
 

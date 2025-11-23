@@ -1,5 +1,6 @@
-import random
 from dataclasses import dataclass
+import random
+
 from shared.domain.worker import WorkerHealthState
 
 
