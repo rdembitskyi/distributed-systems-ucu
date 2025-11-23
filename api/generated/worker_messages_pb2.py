@@ -5,11 +5,14 @@
 # Protobuf Python Version: 6.31.1
 """Generated protocol buffer code."""
 
-from google.protobuf import descriptor as _descriptor
-from google.protobuf import descriptor_pool as _descriptor_pool
-from google.protobuf import runtime_version as _runtime_version
-from google.protobuf import symbol_database as _symbol_database
+from google.protobuf import (
+    descriptor as _descriptor,
+    descriptor_pool as _descriptor_pool,
+    runtime_version as _runtime_version,
+    symbol_database as _symbol_database,
+)
 from google.protobuf.internal import builder as _builder
+
 
 _runtime_version.ValidateProtobufRuntimeVersion(
     _runtime_version.Domain.PUBLIC, 6, 31, 1, "", "worker_messages.proto"
@@ -20,7 +23,7 @@ _sym_db = _symbol_database.Default()
 
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n\x15worker_messages.proto\x12\x10secondary_worker"\x9f\x01\n\x16MessageReplicaReceived\x12\x12\n\nmessage_id\x18\x01 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x02 \x01(\t\x12\x17\n\x0fsequence_number\x18\x03 \x01(\x05\x12\x11\n\tparent_id\x18\x04 \x01(\t\x12\x11\n\ttimestamp\x18\x05 \x01(\x01\x12\x11\n\tsignature\x18\x06 \x01(\t\x12\x0e\n\x06status\x18\x07 \x01(\t"l\n\x1bMasterMessageReplicaRequest\x12\x39\n\x07message\x18\x01 \x01(\x0b\x32(.secondary_worker.MessageReplicaReceived\x12\x12\n\nauth_token\x18\x02 \x01(\t"q\n\x1cMasterMessageReplicaResponse\x12\x0e\n\x06status\x18\x01 \x01(\t\x12\x13\n\x0bstatus_code\x18\x02 \x01(\x05\x12\x1a\n\rerror_message\x18\x03 \x01(\tH\x00\x88\x01\x01\x42\x10\n\x0e_error_message".\n\x18MasterHealthCheckRequest\x12\x12\n\nauth_token\x18\x01 \x01(\t"+\n\x19MasterHealthCheckResponse\x12\x0e\n\x06status\x18\x01 \x01(\t"\x14\n\x12GetMessagesRequest"Q\n\x13GetMessagesResponse\x12:\n\x08messages\x18\x01 \x03(\x0b\x32(.secondary_worker.MessageReplicaReceived2\xd0\x02\n\x16SecondaryWorkerService\x12q\n\x10ReplicateMessage\x12-.secondary_worker.MasterMessageReplicaRequest\x1a..secondary_worker.MasterMessageReplicaResponse\x12g\n\x0cReportHealth\x12*.secondary_worker.MasterHealthCheckRequest\x1a+.secondary_worker.MasterHealthCheckResponse\x12Z\n\x0bGetMessages\x12$.secondary_worker.GetMessagesRequest\x1a%.secondary_worker.GetMessagesResponseb\x06proto3'
+    b'\n\x15worker_messages.proto\x12\x10secondary_worker"\x9f\x01\n\x16MessageReplicaReceived\x12\x12\n\nmessage_id\x18\x01 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x02 \x01(\t\x12\x17\n\x0fsequence_number\x18\x03 \x01(\x05\x12\x11\n\tparent_id\x18\x04 \x01(\t\x12\x11\n\ttimestamp\x18\x05 \x01(\x01\x12\x11\n\tsignature\x18\x06 \x01(\t\x12\x0e\n\x06status\x18\x07 \x01(\t"l\n\x1bMasterMessageReplicaRequest\x12\x39\n\x07message\x18\x01 \x01(\x0b\x32(.secondary_worker.MessageReplicaReceived\x12\x12\n\nauth_token\x18\x02 \x01(\t"q\n\x1cMasterMessageReplicaResponse\x12\x0e\n\x06status\x18\x01 \x01(\t\x12\x13\n\x0bstatus_code\x18\x02 \x01(\x05\x12\x1a\n\rerror_message\x18\x03 \x01(\tH\x00\x88\x01\x01\x42\x10\n\x0e_error_message".\n\x18MasterHealthCheckRequest\x12\x12\n\nauth_token\x18\x01 \x01(\t"+\n\x19MasterHealthCheckResponse\x12\x0e\n\x06status\x18\x01 \x01(\t"\x14\n\x12GetMessagesRequest"Q\n\x13GetMessagesResponse\x12:\n\x08messages\x18\x01 \x03(\x0b\x32(.secondary_worker.MessageReplicaReceived"R\n\x14InjectFailureRequest\x12\x1c\n\x14\x66\x61il_next_n_requests\x18\x01 \x01(\x05\x12\x12\n\x05where\x18\x02 \x01(\tH\x00\x88\x01\x01\x42\x08\n\x06_where"\'\n\x15InjectFailureResponse\x12\x0e\n\x06status\x18\x01 \x01(\x08"J\n\x14RecoveryNotification\x12\x1e\n\x16master_latest_sequence\x18\x01 \x01(\x05\x12\x12\n\nauth_token\x18\x02 \x01(\t"(\n\x16RecoveryAcknowledgment\x12\x0e\n\x06status\x18\x01 \x01(\t2\x96\x04\n\x16SecondaryWorkerService\x12q\n\x10ReplicateMessage\x12-.secondary_worker.MasterMessageReplicaRequest\x1a..secondary_worker.MasterMessageReplicaResponse\x12g\n\x0cReportHealth\x12*.secondary_worker.MasterHealthCheckRequest\x1a+.secondary_worker.MasterHealthCheckResponse\x12Z\n\x0bGetMessages\x12$.secondary_worker.GetMessagesRequest\x1a%.secondary_worker.GetMessagesResponse\x12`\n\rInjectFailure\x12&.secondary_worker.InjectFailureRequest\x1a\'.secondary_worker.InjectFailureResponse\x12\x62\n\x0eHandleRecovery\x12&.secondary_worker.RecoveryNotification\x1a(.secondary_worker.RecoveryAcknowledgmentb\x06proto3'
 )
 
 _globals = globals()
@@ -42,6 +45,14 @@ if not _descriptor._USE_C_DESCRIPTORS:
     _globals["_GETMESSAGESREQUEST"]._serialized_end = 543
     _globals["_GETMESSAGESRESPONSE"]._serialized_start = 545
     _globals["_GETMESSAGESRESPONSE"]._serialized_end = 626
-    _globals["_SECONDARYWORKERSERVICE"]._serialized_start = 629
-    _globals["_SECONDARYWORKERSERVICE"]._serialized_end = 965
+    _globals["_INJECTFAILUREREQUEST"]._serialized_start = 628
+    _globals["_INJECTFAILUREREQUEST"]._serialized_end = 710
+    _globals["_INJECTFAILURERESPONSE"]._serialized_start = 712
+    _globals["_INJECTFAILURERESPONSE"]._serialized_end = 751
+    _globals["_RECOVERYNOTIFICATION"]._serialized_start = 753
+    _globals["_RECOVERYNOTIFICATION"]._serialized_end = 827
+    _globals["_RECOVERYACKNOWLEDGMENT"]._serialized_start = 829
+    _globals["_RECOVERYACKNOWLEDGMENT"]._serialized_end = 869
+    _globals["_SECONDARYWORKERSERVICE"]._serialized_start = 872
+    _globals["_SECONDARYWORKERSERVICE"]._serialized_end = 1406
 # @@protoc_insertion_point(module_scope)

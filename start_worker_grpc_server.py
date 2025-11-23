@@ -2,18 +2,23 @@
 gRPC server startup script for Secondary Worker
 """
 
-import asyncio
 import argparse
+import asyncio
 import logging
+import os
 import signal
 import sys
+
 from secondary_worker.transport.grpc_transport import GrpcTransport
 
 
-# Configure logging
+# Get worker ID from environment
+WORKER_ID = os.getenv("MACHINE_ID", "unknown")
+
+# Configure logging with worker ID
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    format=f"%(asctime)s - WORKER[{WORKER_ID}] - %(name)s - [%(filename)s:%(lineno)d] - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(sys.stdout),
         logging.FileHandler("/app/logs/worker.log"),

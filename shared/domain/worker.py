@@ -2,10 +2,12 @@ from dataclasses import dataclass
 from enum import Enum
 
 
-class WorkerStatus(Enum):
+class WorkerHealthState(Enum):
+    """Health states for worker nodes"""
+
     HEALTHY = "healthy"
-    DEAD = "dead"
     SUSPECTED = "suspected"
+    UNHEALTHY = "unhealthy"
 
 
 @dataclass
@@ -16,4 +18,4 @@ class Worker:
     address: str
     port: int
     is_active: bool = True
-    status: WorkerStatus = WorkerStatus.HEALTHY
+    status: WorkerHealthState = WorkerHealthState.HEALTHY

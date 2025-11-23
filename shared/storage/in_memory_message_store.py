@@ -1,9 +1,9 @@
-import logging
 from collections import OrderedDict
+import logging
 from typing import Dict, List, Optional
+
 from shared.domain.messages import Message, MessageStatus
 from shared.storage.interface import MessageStoreInterface
-from threading import Lock
 from shared.utils.singleton import singleton
 
 
@@ -32,43 +32,37 @@ class MessageStore(MessageStoreInterface):
         # Auxiliary indexes for O(1) lookups
         self.id_to_sequence = {}  # msg_id -> sequence_number
         self.parent_index = {}  # child_id -> parent_id
-        self.children_index = {}  # parent_id -> Set[child_ids]
+        self.children_index = {}  # parent_id -> child_id : dict
 
         # Track latest for O(1) access
         self.latest_message = None
 
-        # Thread safety
-        self.lock = Lock()
-
-    def add_message(self, message: Message) -> bool:
+    def add_message(self, message: Message, missing_parent: bool) -> bool:
         """Add a message - O(1) operation"""
-        with self.lock:
-            parent_id = ""
-            sequence_number = 1
-            if self.latest_message:
-                logger.info(f"Found latest message: {self.latest_message}")
-                parent_id = self.latest_message.message_id
-                sequence_number = self.latest_message.sequence_number + 1
+        self.set_message_status(
+            message=message,
+            status=MessageStatus.MISSING_PARENT
+            if missing_parent
+            else MessageStatus.DELIVERED,
+        )
+        logger.info(f"Adding message: {message}")
+        # Store in primary structure
+        self.messages[message.sequence_number] = message
 
-            self.set_message_status(message=message, status=MessageStatus.DELIVERED)
-            logger.info(f"Adding message: {message}")
-            # Store in primary structure
-            self.messages[sequence_number] = message
+        # Update indexes
+        msg_id = message.message_id
+        self.id_to_sequence[msg_id] = message.sequence_number
 
-            # Update indexes
-            msg_id = message.message_id
-            self.id_to_sequence[msg_id] = sequence_number
+        # Update parent-child relationships
+        if message.parent_id:
+            self.parent_index[msg_id] = message.parent_id
+            self.children_index[message.parent_id] = msg_id
 
-            # Update parent-child relationships
-            if parent_id:
-                self.parent_index[msg_id] = parent_id
-                if parent_id not in self.children_index:
-                    self.children_index[parent_id] = set()
-                self.children_index[parent_id].add(msg_id)
+        self.set_latest(message=message)
 
-            self.set_latest(message=message)
+        self._process_waiting_children(message_id=message.message_id)
 
-            return True
+        return True
 
     def get_messages(self) -> list[Message]:
         return [
@@ -96,38 +90,40 @@ class MessageStore(MessageStoreInterface):
         seq = self.id_to_sequence.get(msg_id)
         return self.messages.get(seq) if seq is not None else None
 
-    def get_parent(self, msg_id: str) -> Optional[Dict]:
+    def get_parent(self, msg_id: str) -> Optional[Message]:
         """Get parent message - O(1)"""
         parent_id = self.parent_index.get(msg_id)
         if parent_id:
             return self.get_by_id(parent_id)
         return None
 
-    def get_children(self, msg_id: str) -> List[Dict]:
-        """Get all direct children - O(k) where k is number of children"""
-        child_ids = self.children_index.get(msg_id, set())
-        return [self.get_by_id(child_id) for child_id in child_ids]
+    def get_child(self, msg_id: str) -> Message | None:
+        """Get the direct child (single next message)"""
+        child_id = self.children_index.get(msg_id)
+        return self.get_by_id(child_id) if child_id else None
+
+    def get_descendants(self, msg_id: str) -> List[Message]:
+        """Get all descendants"""
+        messages = []
+        child_id = self.children_index.get(msg_id)
+        while child_id:
+            child_msg = self.get_by_id(child_id)
+            messages.append(child_msg)
+            child_id = self.children_index.get(child_id)
+        return messages
 
     def set_message_status(self, message: Message, status: MessageStatus):
-        """Set message status - O(1)"""
         message.status = status
 
-    def get_chain_from_message(self, msg_id: str) -> List[Dict]:
-        """Get full parent chain from a message - O(n) where n is chain length"""
-        chain = []
-        current_id = msg_id
-
-        while current_id:
-            msg = self.get_by_id(current_id)
-            if not msg:
-                break
-            chain.append(msg)
-            current_id = self.parent_index.get(current_id)
-
-        return list(reversed(chain))  # Return from oldest to newest
-
-    def get_last_n_messages(self, n: int) -> List[Dict]:
-        """Get last n messages - O(n)"""
-        # OrderedDict maintains insertion order
-        sequences = list(self.messages.keys())[-n:]
-        return [self.messages[seq] for seq in sequences]
+    def _process_waiting_children(self, message_id: str):
+        if not message_id:
+            return
+        orphan_descendants = self.get_descendants(message_id)
+        for orphan_child in orphan_descendants:
+            if orphan_child.status == MessageStatus.MISSING_PARENT:
+                logger.info(
+                    f"Found orphan children: {orphan_child} - making it visible"
+                )
+                self.set_message_status(
+                    message=orphan_child, status=MessageStatus.DELIVERED
+                )

@@ -1,9 +1,11 @@
+import base64
 import json
 import logging
-import base64
-from cryptography.fernet import Fernet
-from shared.domain.messages import Message
 import os
+
+from cryptography.fernet import Fernet
+
+from shared.domain.messages import Message
 
 
 logger = logging.getLogger(__name__)

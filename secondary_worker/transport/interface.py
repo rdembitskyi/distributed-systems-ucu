@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+
 from secondary_worker.domain.messages import Message
 
 

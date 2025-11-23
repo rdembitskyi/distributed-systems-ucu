@@ -9,21 +9,34 @@ service MessageService {
 
   // Get all messages
   rpc GetMessages (GetMessagesRequest) returns (GetMessagesResponse);
+
+  // sync with master
+  rpc CatchUp(CatchUpRequest) returns (CatchUpResponse);
 }
 
 // Request message for posting a new message from a client
 message PostMessageRequest {
   string content = 1;
   int32 write_concern = 2; // Number of replicas required to acknowledge the write
+  string client_id = 3;
 }
 
-// Message data structure. Used for replication and storage.
+// Message data structure. Used for sending back to the customer.
 message Message {
   string message_id = 1;    // UUID
   string content = 2;
   int32 sequence_number = 3;
   string parent_id = 4;
   double timestamp = 5;
+}
+
+message SignedMessage {
+  string message_id = 1;    // UUID
+  string content = 2;
+  int32 sequence_number = 3;
+  string parent_id = 4;
+  double timestamp = 5;
+  string signature = 6;
 }
 
 // Response message for posting a message
@@ -40,4 +53,17 @@ message GetMessagesRequest {
 // Response message for getting messages
 message GetMessagesResponse {
   repeated Message messages = 1;
+}
+
+// Worker sends catch-up messages to master
+message CatchUpRequest {
+    int32 last_sequence_number = 1;
+    string auth_token = 2;
+}
+
+
+// Master response with missing messages
+message CatchUpResponse {
+    string status = 1;
+    repeated SignedMessage messages = 2;
 }

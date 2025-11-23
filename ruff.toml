@@ -121,10 +121,28 @@ unfixable = []
 # Settings for import sorting (isort).
 [lint.isort]
 # A list of modules that should be considered "first-party" (your own code).
-# Ruff will automatically detect your project's packages, but you can add more.
-known-first-party = ["my_project_name"]
-# If you want to group certain third-party imports together.
-# known-third-party = ["fastapi", "pydantic", "sqlalchemy"]
+known-first-party = ["master", "secondary_worker", "shared", "api", "tests"]
+
+# Combine "as" imports on the same line (e.g., `import foo as f, bar as b`)
+combine-as-imports = true
+
+# Force all imports to be on separate lines (one import per line)
+force-single-line = false
+
+# Use parentheses for line continuation instead of backslashes
+force-wrap-aliases = true
+
+# Split imports with multiple members across multiple lines
+split-on-trailing-comma = true
+
+# Import sections order: FUTURE, STDLIB, THIRDPARTY, FIRSTPARTY, LOCALFOLDER
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
+
+# Add a blank line between import sections
+lines-after-imports = 2
+
+# Sort imports within their section (case-insensitive)
+force-sort-within-sections = true
 
 # Settings for docstring linting (pydocstyle).
 [lint.pydocstyle]

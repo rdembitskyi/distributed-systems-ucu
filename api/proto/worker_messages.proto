@@ -12,6 +12,12 @@ service SecondaryWorkerService {
 
   // Get all messages stored in this worker
   rpc GetMessages(GetMessagesRequest) returns (GetMessagesResponse);
+
+  // Inject failures for n next messages
+  rpc InjectFailure(InjectFailureRequest) returns (InjectFailureResponse);
+
+  // Master notifies worker it has recovered
+  rpc HandleRecovery(RecoveryNotification) returns (RecoveryAcknowledgment);
 }
 
 // MessageReceived extends Message
@@ -55,4 +61,22 @@ message GetMessagesRequest {
 // Get Messages Response
 message GetMessagesResponse {
   repeated MessageReplicaReceived messages = 1;
+}
+
+message InjectFailureRequest {
+    int32 fail_next_n_requests = 1;
+    optional string where = 2;
+}
+
+message InjectFailureResponse {
+    bool status = 1;
+}
+
+message RecoveryNotification {
+    int32 master_latest_sequence = 1;
+    string auth_token = 2;
+}
+
+message RecoveryAcknowledgment {
+    string status = 1;
 }

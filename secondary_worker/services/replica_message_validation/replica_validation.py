@@ -1,14 +1,16 @@
 import logging
-from shared.security.message_signer import FernetMessageSigner
-from shared.domain.messages import Message
+
 from secondary_worker.domain.validation import ValidationResult
-from shared.storage.factory import get_messages_storage
 from secondary_worker.services.replica_message_validation.exceptions import (
-    InvalidSignatureError,
+    DuplicateMessageError,
     InvalidParentIdError,
     InvalidSequenceNumberError,
-    DuplicateMessageError,
+    InvalidSignatureError,
 )
+from shared.domain.messages import Message
+from shared.security.message_signer import FernetMessageSigner
+from shared.storage.factory import get_messages_storage
+
 
 # Validation error constants
 INVALID_SIGNATURE_ERROR_MESSAGE = (
@@ -24,15 +26,25 @@ logger = logging.getLogger(__name__)
 def validate_message(message: Message) -> ValidationResult:
     try:
         verify_message_signature(message=message)
+        verify_no_duplicate_message(message=message)
         verify_message_sequence_order(message=message)
     except InvalidSignatureError:
-        return ValidationResult(is_valid=False, error=INVALID_SIGNATURE_ERROR_MESSAGE)
+        return ValidationResult(
+            is_valid=False,
+            error=INVALID_SIGNATURE_ERROR_MESSAGE,
+            corrupted_signature=True,
+        )
     except InvalidParentIdError:
         logger.warning(f"Message {message} parent not found: {message.parent_id}")
         return ValidationResult(
-            is_valid=False, error=MESSAGE_PARENT_NOT_FOUND_ERROR_MESSAGE
+            is_valid=False,
+            error=MESSAGE_PARENT_NOT_FOUND_ERROR_MESSAGE,
+            parent_is_missing=True,
         )
     except InvalidSequenceNumberError:
+        return ValidationResult(is_valid=True, is_duplicated=True)
+    except DuplicateMessageError:
+        logger.warning(f"Message {message} duplicated")
         return ValidationResult(is_valid=True, is_duplicated=True)
 
     return ValidationResult(is_valid=True)
@@ -58,6 +70,7 @@ def verify_message_sequence_order(message: Message) -> bool:
     storage = get_messages_storage()
     parent = storage.get_by_id(msg_id=message.parent_id)
     if not parent:
+        logger.warning(f"Message {message} parent not found")
         raise InvalidParentIdError()
 
     if parent.sequence_number != message.sequence_number - 1:
@@ -69,10 +82,10 @@ def verify_message_sequence_order(message: Message) -> bool:
 def verify_no_duplicate_message(message: Message) -> None:
     storage = get_messages_storage()
 
-    if storage.get_by_id(message.message_id):
+    if storage.get_by_id(msg_id=message.message_id):
         raise DuplicateMessageError("Message with the same ID already exists")
 
-    if storage.get_by_sequence(message.sequence_number):
+    if storage.get_by_sequence(seq=message.sequence_number):
         raise DuplicateMessageError(
             "Message with the same sequence number already exists"
         )

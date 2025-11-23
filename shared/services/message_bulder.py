@@ -1,11 +1,10 @@
-import logging
 from datetime import datetime
-from typing import Optional
+import logging
 from uuid import uuid4
 
 from shared.domain.messages import Message, MessageStatus
-from shared.storage.interface import MessageStoreInterface
 from shared.security.message_signer import FernetMessageSigner
+from shared.storage.interface import MessageStoreInterface
 
 
 logger = logging.getLogger(__name__)
@@ -21,12 +20,13 @@ class MessageBuilder:
         self.store = store
         self.signer = FernetMessageSigner()
 
-    def create_message(self, content: str) -> Message | None:
+    def create_message(self, content: str, client_id: str) -> Message | None:
         """
         Create and store a new message with proper validation and chaining.
 
         Args:
             content: The message content
+            client_id: The client id
 
         """
         if not self._validate_content(content):
@@ -34,7 +34,7 @@ class MessageBuilder:
             return None
 
         try:
-            message = self._build_message(content=content)
+            message = self._build_message(content=content, client_id=client_id)
 
             self.signer.sign_message(message=message)
 
@@ -63,7 +63,7 @@ class MessageBuilder:
 
         return True
 
-    def _build_message(self, content: str) -> Message:
+    def _build_message(self, content: str, client_id: str) -> Message:
         """Build a Message object with proper metadata"""
         msg_id = str(uuid4())
         parent_id = self._get_parent_id()
@@ -71,6 +71,7 @@ class MessageBuilder:
 
         return Message(
             message_id=msg_id,
+            client_id=client_id,
             content=content.strip(),
             sequence_number=sequence_number,
             parent_id=parent_id,
@@ -87,14 +88,3 @@ class MessageBuilder:
         """Get the next sequence number"""
         latest = self.store.get_latest()
         return latest.sequence_number + 1 if latest else 1
-
-    def get_message_chain(self, msg_id: str) -> list[Message]:
-        """Get the full message chain from a specific message"""
-        return self.store.get_chain_from_message(msg_id)
-
-    def get_recent_messages(self, count: int = 10) -> list[Message]:
-        """Get recent messages with validation"""
-        if count <= 0:
-            return []
-
-        return self.store.get_last_n_messages(min(count, 100))  # Cap at 100

@@ -1,14 +1,20 @@
-import logging
+"""
+Tests for iteration 1: Old approach, you need to
+"""
+
 import asyncio
+import logging
+
 import grpc
 
 # Import the gRPC generated stubs
 from api.generated import (
     master_messages_pb2,
     master_messages_pb2_grpc,
-    worker_messages_pb2_grpc,
     worker_messages_pb2,
+    worker_messages_pb2_grpc,
 )
+
 
 logger = logging.getLogger(__name__)
 SERVER_ADDRESS = "localhost:50052"
@@ -20,7 +26,7 @@ def get_worker_client(port: int):
     return worker_messages_pb2_grpc.SecondaryWorkerServiceStub(channel)
 
 
-async def test_dockerized_grpc_server():
+async def test_dockerized_grpc_server(docker_services):
     """
     Test client for sending requests to a dockerized gRPC server.
     The server should be running via start_grpc_server.py.
@@ -36,7 +42,7 @@ async def test_dockerized_grpc_server():
             logger.info("--- Sending first message ---")
             content1 = "Hello from test client!"
             request = master_messages_pb2.PostMessageRequest(
-                content=content1, write_concern=3
+                content=content1, write_concern=3, client_id="random"
             )
             logger.info(f"Sending request: {request}")
 
@@ -71,7 +77,7 @@ async def test_dockerized_grpc_server():
             logger.info("\n--- Sending second message ---")
             content2 = "This is another test message."
             request = master_messages_pb2.PostMessageRequest(
-                content=content2, write_concern=2
+                content=content2, write_concern=2, client_id="random"
             )
             response2 = await stub.PostMessage(request)
             logger.info(
@@ -97,7 +103,3 @@ async def test_dockerized_grpc_server():
         logger.error(f"Connection error: {e}")
         logger.error("Make sure the gRPC server is running on localhost:50052")
         raise
-
-
-if __name__ == "__main__":
-    asyncio.run(test_dockerized_grpc_server())
