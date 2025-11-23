@@ -1,6 +1,5 @@
 from datetime import datetime
 import logging
-from typing import Optional
 from uuid import uuid4
 
 from shared.domain.messages import Message, MessageStatus
@@ -89,14 +88,3 @@ class MessageBuilder:
         """Get the next sequence number"""
         latest = self.store.get_latest()
         return latest.sequence_number + 1 if latest else 1
-
-    def get_message_chain(self, msg_id: str) -> list[Message]:
-        """Get the full message chain from a specific message"""
-        return self.store.get_chain_from_message(msg_id)
-
-    def get_recent_messages(self, count: int = 10) -> list[Message]:
-        """Get recent messages with validation"""
-        if count <= 0:
-            return []
-
-        return self.store.get_last_n_messages(min(count, 100))  # Cap at 100

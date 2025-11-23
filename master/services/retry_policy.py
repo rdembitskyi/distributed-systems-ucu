@@ -6,7 +6,23 @@ from shared.domain.worker import WorkerHealthState
 
 @dataclass
 class RetryPolicy:
-    """Defines retry behavior based on worker health"""
+    """
+    Defines retry behavior based on worker health.
+
+    Retry Strategy:
+    - HEALTHY: 5 quick retries for transient failures (network blips, brief overload)
+    - SUSPECTED: 15 retries with backoff for degraded but potentially alive nodes
+    - UNHEALTHY: 0 retries - delegate to sync mechanism for efficiency
+
+    Why not infinite retries on UNHEALTHY nodes?
+    Retrying dead nodes wastes resources. Instead, we use the sync mechanism:
+    1. Heartbeat detects recovery (heartbeat.py:121-123)
+    2. Triggers recovery callback (workers.py:349-365)
+    3. Worker gets ALL missed messages via sync (sync_service.py:37-111)
+
+    This provides eventual consistency guarantees without wasting resources.
+    The system never gives up on message delivery - it just switches mechanisms.
+    """
 
     max_attempts: int
     base_delay: float  # seconds
@@ -24,7 +40,7 @@ class RetryPolicy:
                 max_attempts=10, base_delay=2.0, max_delay=30.0
             ),
             WorkerHealthState.UNHEALTHY: RetryPolicy(
-                max_attempts=0,  # No point to try on dead node, node would request re-sync after coming online.
+                max_attempts=0,  # Sync mechanism handles recovery (see class docstring)
                 base_delay=30.0,
                 max_delay=180.0,
             ),

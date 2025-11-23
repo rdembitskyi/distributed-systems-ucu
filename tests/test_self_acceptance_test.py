@@ -9,7 +9,7 @@ from .conftest import return_timeout
 
 
 @pytest.mark.integration
-async def test_self_acceptance_test(
+async def test_self_acceptance_iteration_3(
     worker_manager, docker_master, master_client, worker1_client, worker2_client
 ):
 

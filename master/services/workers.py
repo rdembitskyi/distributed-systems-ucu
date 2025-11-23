@@ -1,4 +1,5 @@
 import asyncio
+from collections import deque
 import logging
 import os
 from typing import Dict, List
@@ -43,7 +44,7 @@ class WorkersService:
         ] = {}
         self.heartbeat_service: HeartBeatService | None = None
         self._initialize_workers()
-        self._background_tasks = {}
+        self._background_tasks: deque = deque(maxlen=1000)
 
     def _initialize_workers(self):
         """Initialize static worker registry"""
@@ -337,14 +338,21 @@ class WorkersService:
         create_task(). Without storing a reference, tasks may be garbage collected
         before completion, causing them to be cancelled silently.
 
-        This method stores the task and automatically cleans it up when done via
-        a callback to prevent unbounded memory growth.
+        This method stores tasks in a bounded queue (max 1000). When the queue is full,
+        the oldest task reference is automatically dropped (FIFO). Tasks clean themselves
+        up on completion via callback.
         """
-        task_id = hash(task)
-        self._background_tasks[task_id] = task
-        # TODO queue with max of 1000
-        # Auto-cleanup when task completes to prevent memory leak
-        task.add_done_callback(lambda t: self._background_tasks.pop(task_id, None))
+        self._background_tasks.append(task)
+
+        # Auto-cleanup when task completes to prevent holding references to finished tasks
+        def cleanup(t):
+            try:
+                self._background_tasks.remove(t)
+            except ValueError:
+                # Task already removed (e.g., dropped due to maxlen)
+                pass
+
+        task.add_done_callback(cleanup)
 
     async def send_on_worker_recovery_request(self, worker_id: str):
         storage = get_messages_storage()

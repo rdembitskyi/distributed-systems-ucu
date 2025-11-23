@@ -179,7 +179,6 @@ async def test_message_secondary_blocked_waiting_on_quorum(
     write_concern = 3
 
     # When: POST message to master
-    start_time = time.time()
 
     async def send_message():
         return await master_client.PostMessage(

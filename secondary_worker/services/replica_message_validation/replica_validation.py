@@ -27,14 +27,24 @@ def validate_message(message: Message) -> ValidationResult:
     try:
         verify_message_signature(message=message)
         verify_message_sequence_order(message=message)
+        verify_no_duplicate_message(message=message)
     except InvalidSignatureError:
-        return ValidationResult(is_valid=False, error=INVALID_SIGNATURE_ERROR_MESSAGE)
+        return ValidationResult(
+            is_valid=False,
+            error=INVALID_SIGNATURE_ERROR_MESSAGE,
+            corrupted_signature=True,
+        )
     except InvalidParentIdError:
         logger.warning(f"Message {message} parent not found: {message.parent_id}")
         return ValidationResult(
-            is_valid=False, error=MESSAGE_PARENT_NOT_FOUND_ERROR_MESSAGE
+            is_valid=False,
+            error=MESSAGE_PARENT_NOT_FOUND_ERROR_MESSAGE,
+            parent_is_missing=True,
         )
     except InvalidSequenceNumberError:
+        return ValidationResult(is_valid=True, is_duplicated=True)
+    except DuplicateMessageError:
+        logger.warning(f"Message {message} duplicated")
         return ValidationResult(is_valid=True, is_duplicated=True)
 
     return ValidationResult(is_valid=True)
@@ -72,10 +82,10 @@ def verify_message_sequence_order(message: Message) -> bool:
 def verify_no_duplicate_message(message: Message) -> None:
     storage = get_messages_storage()
 
-    if storage.get_by_id(message.message_id):
+    if storage.get_by_id(msg_id=message.message_id):
         raise DuplicateMessageError("Message with the same ID already exists")
 
-    if storage.get_by_sequence(message.sequence_number):
+    if storage.get_by_sequence(seq=message.sequence_number):
         raise DuplicateMessageError(
             "Message with the same sequence number already exists"
         )

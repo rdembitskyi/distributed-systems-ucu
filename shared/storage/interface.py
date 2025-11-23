@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
+from typing import List, Optional
 
-from shared.domain.messages import Message
+from shared.domain.messages import Message, MessageStatus
 
 
 class MessageStoreInterface(ABC):
@@ -13,12 +13,13 @@ class MessageStoreInterface(ABC):
     """
 
     @abstractmethod
-    def add_message(self, message: Message) -> bool:
+    def add_message(self, message: Message, pending: bool) -> bool:
         """
         Add a new message to the store.
 
         Args:
             message: Dictionary containing message data with 'content' key
+            pending: Boolean indicating whether this message is pending or not
 
         Returns:
             bool: True if message was added successfully, False otherwise
@@ -31,6 +32,10 @@ class MessageStoreInterface(ABC):
 
     @abstractmethod
     def get_messages_ids(self) -> list[str]:
+        pass
+
+    @abstractmethod
+    def set_latest(self, message: Message):
         pass
 
     @abstractmethod
@@ -83,12 +88,16 @@ class MessageStoreInterface(ABC):
         pass
 
     @abstractmethod
-    def get_children(self, msg_id: str) -> List[Message]:
+    def get_child(self, msg_id: str) -> Message | None:
+        pass
+
+    @abstractmethod
+    def get_descendants(self, msg_id: str) -> List[Message]:
         """
-        Get all direct children of the specified message.
+        Get all direct descendants of the specified message.
 
         Args:
-            msg_id: Message ID to find children for
+            msg_id: Message ID to find descendants
 
         Returns:
             List[Message]: List of child messages (empty if no children)
@@ -96,27 +105,9 @@ class MessageStoreInterface(ABC):
         pass
 
     @abstractmethod
-    def get_chain_from_message(self, msg_id: str) -> List[Message]:
-        """
-        Get the full parent chain starting from the specified message.
-
-        Args:
-            msg_id: Message ID to start chain from
-
-        Returns:
-            List[Message]: Chain of messages from root to specified message
-        """
+    def set_message_status(self, message: Message, status: MessageStatus):
         pass
 
     @abstractmethod
-    def get_last_n_messages(self, n: int) -> List[Message]:
-        """
-        Get the last n messages in chronological order.
-
-        Args:
-            n: Number of recent messages to retrieve
-
-        Returns:
-            List[Message]: Last n messages (may be fewer if store has less than n messages)
-        """
+    def _process_waiting_children(self, parent_id: str):
         pass

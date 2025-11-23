@@ -52,7 +52,7 @@ class GrpcTransport(MasterTransportInterface):
                 total_messages=len(self.store.get_messages()),
             )
 
-        self.store.add_message(message=message)
+        self.store.add_message(message=message, missing_parent=False)
         await self.workers_service.replicate_message_to_workers(
             message=message, write_concern=write_concern
         )
@@ -74,7 +74,7 @@ class GrpcTransport(MasterTransportInterface):
             return self.store.get_messages()
 
         worker_latest = self.store.get_by_sequence(last_sequence_number)
-        return self.store.get_children(worker_latest.message_id)
+        return self.store.get_descendants(worker_latest.message_id)
 
     async def start_server(self, port: int = 50051):
         """Start the async gRPC server"""

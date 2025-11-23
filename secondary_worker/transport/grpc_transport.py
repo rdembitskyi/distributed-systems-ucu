@@ -15,6 +15,7 @@ from secondary_worker.services.replica_message_validation.replica_validation imp
 )
 from secondary_worker.services.sync_service import WorkerSyncService
 from secondary_worker.transport.interface import SecondaryTransportInterface
+from shared.domain.messages import MessageStatus
 from shared.domain.response import HealthStatus, ResponseStatus, SyncStatus
 from shared.domain.status_codes import StatusCodes
 from shared.security.auth import validate_auth_token
@@ -68,14 +69,17 @@ class GrpcTransport(SecondaryTransportInterface):
 
         validation_result = validate_message(message=message)
         if not validation_result.is_valid:
-            logger.error(
-                f"Replica: Message validation failed: {message} with error: {validation_result.error}"
-            )
-            return MasterMessageReplicaResponse(
-                status=ResponseStatus.ERROR,
-                status_code=StatusCodes.BAD_REQUEST.value,
-                error_message=validation_result.error,
-            )
+            if validation_result.parent_is_missing:
+                logger.warning(f"Replica: Parent message is missing: {message}")
+            elif validation_result.corrupted_signature:
+                logger.error(
+                    f"Replica: Message validation failed: {message} with error: {validation_result.error}"
+                )
+                return MasterMessageReplicaResponse(
+                    status=ResponseStatus.ERROR,
+                    status_code=StatusCodes.BAD_REQUEST.value,
+                    error_message=validation_result.error,
+                )
         if validation_result.is_duplicated:
             logger.error(f"Replica: Duplicated message received: {message}")
             return MasterMessageReplicaResponse(
@@ -84,7 +88,9 @@ class GrpcTransport(SecondaryTransportInterface):
                 error_message="Duplicated message",
             )
 
-        result = self._store.add_message(message)
+        result = self._store.add_message(
+            message=message, missing_parent=validation_result.parent_is_missing
+        )
 
         if not result:
             logger.error("Replica: Failed to add message to the store")
@@ -112,7 +118,7 @@ class GrpcTransport(SecondaryTransportInterface):
                 f"Recovery: worker last number {worker_latest_sequence} is smaller than master latest number {master_latest_sequence}"
             )
             result = await self._worker_sync_service.request_catchup()
-            status = SyncStatus.SYNCED if result else SyncStatus.FAILED
+            status = SyncStatus.SYNCED if result else SyncStatus.FAILED_TO_SYNC
             return RecoveryNotification(status=status)
         else:
             # we don't need any new messages
