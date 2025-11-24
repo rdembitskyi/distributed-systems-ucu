@@ -132,7 +132,7 @@ async def test_self_acceptance_iteration_2(
     worker2_messages = await worker2_client.GetMessages(
         worker_messages_pb2.GetMessagesRequest()
     )
-    assert len(worker2_messages.messages) < 4  # S2 is behind
+    assert len(worker2_messages.messages) < 4  # S2 is behind - this would fail if delay is not set
 
     # Check messages on M|S1 - [Msg1, Msg2, Msg3, Msg4]
     master_messages = await master_client.GetMessages(
