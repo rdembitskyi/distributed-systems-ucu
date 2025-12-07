@@ -53,11 +53,11 @@ def handle_replication_response_from_workers(
 
     if retry_workers:
         return ReplicationResult(
-            success=False,
+            total_success=False,
             total_workers=len(results),
             failed_workers=[],
             retry_workers=retry_workers,
             error_message=f"Replication failed for workers: {retry_workers}",
         )
     else:
-        return ReplicationResult(success=True, total_workers=len(results))
+        return ReplicationResult(total_success=True, total_workers=len(results))

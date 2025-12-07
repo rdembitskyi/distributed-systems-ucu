@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 class ReplicationResult:
     """Result of replication operation"""
 
-    success: bool
+    total_success: bool  # total success, no failed or retried workers
     total_workers: int = 0
     failed_workers: list[str] = field(default_factory=list)
     retry_workers: list[str] = field(default_factory=list)

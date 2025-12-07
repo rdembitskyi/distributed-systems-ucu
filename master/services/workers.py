@@ -76,7 +76,9 @@ class WorkersService:
         """
         if not self.workers:
             return ReplicationResult(
-                success=False, error_message="No workers available", total_workers=0
+                total_success=False,
+                error_message="No workers available",
+                total_workers=0,
             )
         required_replication_count = write_concern - 1  # Subtract 1 for the master
 
@@ -85,7 +87,7 @@ class WorkersService:
 
         if not available_workers:
             return ReplicationResult(
-                success=False,
+                total_success=False,
                 error_message="No active workers available",
                 total_workers=0,
             )
@@ -112,7 +114,7 @@ class WorkersService:
             replication_statuses = handle_replication_response_from_workers(
                 results=completion_result.completed_results
             )
-            if not replication_statuses.success:
+            if not replication_statuses.total_success:
                 # Retry delivery to failed workers, if 100% success wasn't achieved
                 self.replicate_message_to_failed_workers(
                     message=message, replication_statuses=replication_statuses
@@ -134,7 +136,7 @@ class WorkersService:
         except asyncio.TimeoutError:
             logger.error(f"Replication timeout after {self.replication_timeout}s")
             return ReplicationResult(
-                success=False,
+                total_success=False,
                 error_message=f"Replication timeout after {self.replication_timeout}s",
             )
         except RequiredCountNotReached as e:
@@ -153,11 +155,11 @@ class WorkersService:
                         message=message,
                     )
                 )
-                if retry_result.success:
+                if retry_result.total_success:
                     manage_write_availability(
                         client_id=message.client_id, availability=True
                     )
-                    return ReplicationResult(success=True)
+                    return ReplicationResult(total_success=True)
                 if retry_result.success_count >= required_replication_count:
                     manage_write_availability(
                         client_id=message.client_id, availability=True
@@ -165,16 +167,16 @@ class WorkersService:
                     self.replicate_message_to_failed_workers(
                         message=message, replication_statuses=replication_statuses
                     )
-                    return ReplicationResult(success=True)
+                    return ReplicationResult(total_success=True)
             except RequiredCountNotReached:
                 return ReplicationResult(
-                    success=False,
+                    total_success=False,
                     error_message=f"Replication failed: required_count not reached",
                 )
         except Exception as e:
             logger.error(f"Unexpected error during replication: {e}")
             return ReplicationResult(
-                success=False, error_message=f"Unexpected error: {str(e)}"
+                total_success=False, error_message=f"Unexpected error: {str(e)}"
             )
 
     async def replicate_to_worker(
@@ -261,7 +263,7 @@ class WorkersService:
         state = self.heartbeat_service.get_worker_state(worker_id=worker_id)
         policy = RetryPolicy.for_health_state(state=state)
         last_result = ReplicationResult(
-            success=False,
+            total_success=False,
         )
         for attempt in range(policy.max_attempts):
             result = await self.replicate_to_worker(
@@ -270,7 +272,7 @@ class WorkersService:
             replication_status = handle_replication_response_from_workers(
                 results=[result]
             )
-            if replication_status.success:
+            if replication_status.total_success:
                 # Task cleanup happens automatically via callback
                 return replication_status, worker_id
 
@@ -300,14 +302,14 @@ class WorkersService:
         ]
         for task in asyncio.as_completed(retry_tasks):
             retry_result, worker_id = await task
-            if retry_result.success:
+            if retry_result.total_success:
                 replication_statuses.remove_retry_worker(worker_id=worker_id)
                 if replication_statuses.success_count >= replication_count:
                     logger.info(
                         f"Successfully replicated message {message.message_id} to {replication_count} workers after retries"
                     )
                     return ReplicationResult(
-                        success=True,
+                        total_success=True,
                     )
         raise RequiredCountNotReached(
             f"Replication: Failed to reach required_count of {replication_count} tasks"
@@ -335,7 +337,7 @@ class WorkersService:
         replication_statuses = handle_replication_response_from_workers(
             results=completed_results
         )
-        if not replication_statuses.success:
+        if not replication_statuses.total_success:
             self.replicate_message_to_failed_workers(
                 message=message, replication_statuses=replication_statuses
             )
