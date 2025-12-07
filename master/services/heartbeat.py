@@ -184,35 +184,15 @@ class HeartBeatService:
         worker_health = self.worker_health.get(worker_id)
         return worker_health.state
 
-    def get_worker_health(self, worker_id: str) -> WorkerHealthInfo | None:
-        """Get current health info of a worker"""
-        return self.worker_health.get(worker_id)
-
     def get_all_workers(self) -> List[str]:
         return [wid for wid, info in self.worker_health.items()]
-
-    def get_healthy_workers(self) -> List[str]:
-        """Get list of HEALTHY worker IDs"""
-        return [
-            wid
-            for wid, info in self.worker_health.items()
-            if info.state == WorkerHealthState.HEALTHY
-        ]
 
     def get_available_workers(self) -> List[str]:
         """Get HEALTHY + SUSPECTED worker IDs"""
         return [
             wid
             for wid, info in self.worker_health.items()
-            if info.state in (WorkerHealthState.HEALTHY, WorkerHealthState.SUSPECTED)
-        ]
-
-    def get_unhealthy_workers(self) -> List[str]:
-        """Get UNHEALTHY worker IDs"""
-        return [
-            wid
-            for wid, info in self.worker_health.items()
-            if info.state == WorkerHealthState.UNHEALTHY
+            if info.state != WorkerHealthState.UNHEALTHY
         ]
 
     def is_worker_available(self, worker_id: str) -> bool:

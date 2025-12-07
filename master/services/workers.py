@@ -45,7 +45,7 @@ class WorkersService:
         self.heartbeat_service: HeartBeatService | None = None
         self._initialize_workers()
         self._background_tasks: deque = deque(maxlen=1000)
-        self.quorum_quote = QuorumLevel(
+        self.quorum_quota = QuorumLevel(
             int(os.environ.get("QUORUM_LEVEL", QuorumLevel.ONE.value))
         )
 
@@ -103,23 +103,25 @@ class WorkersService:
         try:
             # Wait for workers
             # returns also tasks still running when required_count was reached
-            replication_result = await wait_for_required_count(
+            completion_result = await wait_for_required_count(
                 tasks=replication_tasks,
                 required_count=required_replication_count,
             )
 
-            # Check if all replications succeeded
+            # Parse completion results
             replication_statuses = handle_replication_response_from_workers(
-                results=replication_result.completed_results
+                results=completion_result.completed_results
             )
             if not replication_statuses.success:
-                self.replicate_message_to_remaining_workers(
+                # Retry delivery to failed workers, if 100% success wasn't achieved
+                self.replicate_message_to_failed_workers(
                     message=message, replication_statuses=replication_statuses
                 )
-            if replication_result.pending_tasks:
+            if completion_result.pending_tasks:
+                # Write concern was met - but we want to deliver messages to pending workers as well
                 task = asyncio.create_task(
                     self.handle_results_from_pending_workers(
-                        message=message, pending_tasks=replication_result.pending_tasks
+                        message=message, pending_tasks=completion_result.pending_tasks
                     )
                 )
                 self._add_task_worker_instance(task=task)
@@ -160,7 +162,7 @@ class WorkersService:
                     manage_write_availability(
                         client_id=message.client_id, availability=True
                     )
-                    self.replicate_message_to_remaining_workers(
+                    self.replicate_message_to_failed_workers(
                         message=message, replication_statuses=replication_statuses
                     )
                     return ReplicationResult(success=True)
@@ -232,14 +234,6 @@ class WorkersService:
                 status_code=StatusCodes.INTERNAL_SERVER_ERROR.value,
                 error_message=f"Unexpected error: {str(e)}",
             )
-
-    def get_active_workers(self) -> List[Worker]:
-        """Get list of active workers"""
-        return [worker for worker in self.workers.values() if worker.is_active]
-
-    def get_worker_count(self) -> int:
-        """Get total number of active workers"""
-        return len(self.get_active_workers())
 
     async def health_check_worker(self, worker_id) -> bool:
         """Check health of worker"""
@@ -319,10 +313,10 @@ class WorkersService:
             f"Replication: Failed to reach required_count of {replication_count} tasks"
         )
 
-    def replicate_message_to_remaining_workers(
+    def replicate_message_to_failed_workers(
         self, message: Message, replication_statuses: ReplicationResult
     ) -> bool:
-        """Replicate message to remaining workers in the background"""
+        """Replicate message to remaining(failed) workers in the background"""
         remaining_workers = replication_statuses.retry_workers
         # Fire background task for remaining workers
         for worker_id in remaining_workers:
@@ -342,7 +336,7 @@ class WorkersService:
             results=completed_results
         )
         if not replication_statuses.success:
-            self.replicate_message_to_remaining_workers(
+            self.replicate_message_to_failed_workers(
                 message=message, replication_statuses=replication_statuses
             )
 
@@ -392,4 +386,4 @@ class WorkersService:
         available_nodes: int = (
             len(self.heartbeat_service.get_available_workers()) + 1
         )  # Add master
-        return available_nodes >= self.quorum_quote.value
+        return available_nodes >= self.quorum_quota.value
