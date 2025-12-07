@@ -6,19 +6,19 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class QuorumNotReached(Exception):
+class RequiredCountNotReached(Exception):
     def __init__(self, message: str, completed_results: list = None):
         super().__init__(message)
         self.completed_results = completed_results or []
 
 
 @dataclass
-class QuorumResult:
+class CompletionResult:
     completed_results: list  # Coroutine task results including exceptions
     pending_tasks: list
 
 
-async def wait_for_quorum(tasks, required_count: int, timeout: float):
+async def wait_for_required_count(tasks, required_count: int):
     """Wait until required_count tasks complete successfully"""
     logger.info(f"Replication: Waiting for quorum of {required_count} tasks")
     tasks = [asyncio.create_task(coro) for coro in tasks]
@@ -31,7 +31,7 @@ async def wait_for_quorum(tasks, required_count: int, timeout: float):
             logger.info(f"Replication: Success count: {len(success_tasks)}")
             pending_tasks = [task for task in tasks if not task.done()]
             logger.info(f"pending_tasks: {pending_tasks}")
-            return QuorumResult(completed_results=[], pending_tasks=pending_tasks)
+            return CompletionResult(completed_results=[], pending_tasks=pending_tasks)
         result = await coro
         if bool(result):
             success_tasks.append(result)
@@ -41,11 +41,11 @@ async def wait_for_quorum(tasks, required_count: int, timeout: float):
 
         if len(success_tasks) >= required_count:
             pending_tasks = [task for task in tasks if not task.done()]
-            return QuorumResult(
+            return CompletionResult(
                 completed_results=success_tasks + failure_tasks,
                 pending_tasks=pending_tasks,
             )
-    raise QuorumNotReached(
+    raise RequiredCountNotReached(
         message=f"Replication: Failed to reach quorum of {required_count} tasks",
         completed_results=success_tasks + failure_tasks,
     )

@@ -23,7 +23,7 @@ from shared.domain.status_codes import StatusCodes
 from shared.domain.worker import Worker
 from shared.security.auth import get_auth_token
 from shared.storage.factory import get_messages_storage
-from shared.utils.concurrency import QuorumNotReached, wait_for_quorum
+from shared.utils.concurrency import RequiredCountNotReached, wait_for_required_count
 
 
 logger = logging.getLogger(__name__)
@@ -100,31 +100,30 @@ class WorkersService:
         try:
             # Wait for workers quorum
             # returns also tasks still running when quorum was reached
-            quorum_count = write_concern - 1  # Subtract 1 for the master
-            quorum_result = await wait_for_quorum(
+            required_replication_count = write_concern - 1  # Subtract 1 for the master
+            replication_result = await wait_for_required_count(
                 tasks=replication_tasks,
-                required_count=quorum_count,
-                timeout=self.replication_timeout,
+                required_count=required_replication_count,
             )
 
             # Check if all replications succeeded
             replication_statuses = handle_replication_response_from_workers(
-                results=quorum_result.completed_results
+                results=replication_result.completed_results
             )
             if not replication_statuses.success:
                 self.replicate_message_to_remaining_workers(
                     message=message, replication_statuses=replication_statuses
                 )
-            if quorum_result.pending_tasks:
+            if replication_result.pending_tasks:
                 task = asyncio.create_task(
                     self.handle_results_from_pending_workers(
-                        message=message, pending_tasks=quorum_result.pending_tasks
+                        message=message, pending_tasks=replication_result.pending_tasks
                     )
                 )
                 self._add_task_worker_instance(task=task)
 
             logger.info(
-                f"Successfully replicated message {message.message_id} to {quorum_count} workers"
+                f"Successfully replicated message {message.message_id} to {required_replication_count} workers"
             )
             return replication_statuses
 
@@ -134,26 +133,28 @@ class WorkersService:
                 success=False,
                 error_message=f"Replication timeout after {self.replication_timeout}s",
             )
-        except QuorumNotReached as e:
+        except RequiredCountNotReached as e:
             logger.warning(
-                f"Replication: Failed to reach quorum of {quorum_count} workers"
+                f"Replication: Failed to reach quorum of {required_replication_count} workers"
             )
             manage_write_availability(client_id=message.client_id, availability=False)
             replication_statuses = handle_replication_response_from_workers(
                 results=e.completed_results
             )
             try:
-                retry_result = await self.retry_replication_until_quorum_is_reached(
-                    replication_statuses=replication_statuses,
-                    quorum_count=quorum_count,
-                    message=message,
+                retry_result = (
+                    await self.retry_replication_until_target_count_is_reached(
+                        replication_statuses=replication_statuses,
+                        replication_count=required_replication_count,
+                        message=message,
+                    )
                 )
                 if retry_result.success:
                     manage_write_availability(
                         client_id=message.client_id, availability=True
                     )
                     return ReplicationResult(success=True)
-                if retry_result.success_count >= quorum_count:
+                if retry_result.success_count >= required_replication_count:
                     manage_write_availability(
                         client_id=message.client_id, availability=True
                     )
@@ -161,7 +162,7 @@ class WorkersService:
                         message=message, replication_statuses=replication_statuses
                     )
                     return ReplicationResult(success=True)
-            except QuorumNotReached:
+            except RequiredCountNotReached:
                 return ReplicationResult(
                     success=False,
                     error_message=f"Replication failed: Quorum not reached",
@@ -274,8 +275,11 @@ class WorkersService:
 
         return last_result, worker_id
 
-    async def retry_replication_until_quorum_is_reached(
-        self, replication_statuses: ReplicationResult, quorum_count, message
+    async def retry_replication_until_target_count_is_reached(
+        self,
+        replication_statuses: ReplicationResult,
+        replication_count: int,
+        message: Message,
     ):
         workers_to_retry = [
             worker_id for worker_id in replication_statuses.retry_workers
@@ -292,15 +296,15 @@ class WorkersService:
             retry_result, worker_id = await task
             if retry_result.success:
                 replication_statuses.remove_retry_worker(worker_id=worker_id)
-                if replication_statuses.success_count >= quorum_count:
+                if replication_statuses.success_count >= replication_count:
                     logger.info(
-                        f"Successfully replicated message {message.message_id} to {quorum_count} workers after retries"
+                        f"Successfully replicated message {message.message_id} to {replication_count} workers after retries"
                     )
                     return ReplicationResult(
                         success=True,
                     )
-        raise QuorumNotReached(
-            f"Replication: Failed to reach quorum of {quorum_count} tasks"
+        raise RequiredCountNotReached(
+            f"Replication: Failed to reach quorum of {replication_count} tasks"
         )
 
     def replicate_message_to_remaining_workers(
