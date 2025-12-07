@@ -4,7 +4,7 @@ import os
 import signal
 import sys
 
-from master.transport.grpc_transport import GrpcTransport
+from master.transport.controller import GrpcTransport
 
 
 # Configure logging

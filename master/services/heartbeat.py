@@ -214,3 +214,6 @@ class HeartBeatService:
             for wid, info in self.worker_health.items()
             if info.state == WorkerHealthState.UNHEALTHY
         ]
+
+    def is_worker_available(self, worker_id: str) -> bool:
+        return self.get_worker_state(worker_id) != WorkerHealthState.UNHEALTHY

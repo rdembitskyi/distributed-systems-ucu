@@ -8,14 +8,16 @@ logger = logging.getLogger(__name__)
 
 def manage_write_availability(client_id: str, availability: bool):
     """
-    Block writes to the master node until quorum is restored for client.
+    Block writes to the master node until required_count is restored for client.
     """
     manager = ClientStateManager()
     manager.set_master_write_status(client_id=client_id, status=availability)
     if availability:
         logger.info(f"Writing to master node is available")
     else:
-        logger.warning(f"Node writes BLOCKED - waiting for quorum of workers")
+        logger.warning(
+            f"Node writes BLOCKED - waiting for specified write concern of workers"
+        )
     return
 
 

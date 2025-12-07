@@ -9,7 +9,7 @@ import os
 import signal
 import sys
 
-from secondary_worker.transport.grpc_transport import GrpcTransport
+from secondary_worker.transport.controller import GrpcTransport
 
 
 # Get worker ID from environment

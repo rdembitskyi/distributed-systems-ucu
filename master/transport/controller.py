@@ -41,6 +41,14 @@ class GrpcTransport(MasterTransportInterface):
                 total_messages=len(self.store.get_messages()),
             )
 
+        if not self.workers_service.is_quorum_met():
+            logger.info("Service temporarily unavailable for writes (quorum lost)")
+            return PostMessageResponse(
+                status=ResponseStatus.ERROR,
+                message="Service temporarily unavailable for writes (quorum lost)",
+                total_messages=len(self.store.get_messages()),
+            )
+
         message = self.builder.create_message(
             content=message_content, client_id=client_id
         )
