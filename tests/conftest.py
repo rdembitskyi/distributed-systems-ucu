@@ -38,6 +38,7 @@ def docker_services():
     logger.info("Waiting for worker2 service on port 50054...")
     wait_for_service("localhost", 50054, timeout=60)
     logger.info("Worker2 service ready")
+    time.sleep(4)
 
     # Now start master
     logger.info("Starting master container...")

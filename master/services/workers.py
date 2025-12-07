@@ -73,11 +73,13 @@ class WorkersService:
         Returns success only if quorum of workers acknowledge.
         """
         if not self.workers:
+            print(2222222222)
             return ReplicationResult(
                 success=False, error_message="No workers available", total_workers=0
             )
 
         available_workers = self.heartbeat_service.get_all_workers()
+        print(444444444444444, available_workers)
         logger.info(f"Available workers: {available_workers}")
 
         if not available_workers:

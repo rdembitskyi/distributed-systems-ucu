@@ -26,12 +26,11 @@ async def wait_for_required_count(tasks, required_count: int):
     success_tasks = []
     failure_tasks = []
 
+    if required_count == 0:
+        logger.info("Replication: No required count, returning immediately")
+        return CompletionResult(completed_results=[], pending_tasks=tasks)
+
     for coro in asyncio.as_completed(tasks):
-        if required_count == 0:
-            logger.info(f"Replication: Success count: {len(success_tasks)}")
-            pending_tasks = [task for task in tasks if not task.done()]
-            logger.info(f"pending_tasks: {pending_tasks}")
-            return CompletionResult(completed_results=[], pending_tasks=pending_tasks)
         result = await coro
         if bool(result):
             success_tasks.append(result)
