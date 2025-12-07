@@ -24,7 +24,7 @@ from shared.domain.worker import Worker
 from shared.security.auth import get_auth_token
 from shared.storage.factory import get_messages_storage
 from shared.utils.concurrency import RequiredCountNotReached, wait_for_required_count
-
+from shared.config.consistency import QuorumLevel
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +45,9 @@ class WorkersService:
         self.heartbeat_service: HeartBeatService | None = None
         self._initialize_workers()
         self._background_tasks: deque = deque(maxlen=1000)
+        self.quorum_quote = QuorumLevel(
+            int(os.environ.get("QUORUM_LEVEL", QuorumLevel.ONE.value))
+        )
 
     def _initialize_workers(self):
         """Initialize static worker registry"""
@@ -62,7 +65,6 @@ class WorkersService:
             recovery_callback=self.send_on_worker_recovery_request,
         )
         self.heartbeat_service.start_monitoring()
-
         logger.info(f"Initialized {len(self.workers)} workers")
 
     async def replicate_message_to_workers(
@@ -70,16 +72,15 @@ class WorkersService:
     ) -> ReplicationResult | None:
         """
         Replicate message to active workers.
-        Returns success only if quorum of workers acknowledge.
+        Returns success only if write concern amount of workers acknowledge.
         """
         if not self.workers:
-            print(2222222222)
             return ReplicationResult(
                 success=False, error_message="No workers available", total_workers=0
             )
+        required_replication_count = write_concern - 1  # Subtract 1 for the master
 
         available_workers = self.heartbeat_service.get_all_workers()
-        print(444444444444444, available_workers)
         logger.info(f"Available workers: {available_workers}")
 
         if not available_workers:
@@ -100,9 +101,8 @@ class WorkersService:
             replication_tasks.append(task)
 
         try:
-            # Wait for workers quorum
-            # returns also tasks still running when quorum was reached
-            required_replication_count = write_concern - 1  # Subtract 1 for the master
+            # Wait for workers
+            # returns also tasks still running when required_count was reached
             replication_result = await wait_for_required_count(
                 tasks=replication_tasks,
                 required_count=required_replication_count,
@@ -137,7 +137,7 @@ class WorkersService:
             )
         except RequiredCountNotReached as e:
             logger.warning(
-                f"Replication: Failed to reach quorum of {required_replication_count} workers"
+                f"Replication: Failed to reach required_count of {required_replication_count} workers"
             )
             manage_write_availability(client_id=message.client_id, availability=False)
             replication_statuses = handle_replication_response_from_workers(
@@ -167,7 +167,7 @@ class WorkersService:
             except RequiredCountNotReached:
                 return ReplicationResult(
                     success=False,
-                    error_message=f"Replication failed: Quorum not reached",
+                    error_message=f"Replication failed: required_count not reached",
                 )
         except Exception as e:
             logger.error(f"Unexpected error during replication: {e}")
@@ -180,6 +180,14 @@ class WorkersService:
     ) -> MasterMessageReplicaResponse:
         """Replicate message to a single worker"""
         client = self.worker_clients[worker_id]
+
+        if not self.heartbeat_service.is_worker_available(worker_id=worker_id):
+            return MasterMessageReplicaResponse(
+                worker_id=worker_id,
+                status=MessageStatus.FAILED.value,
+                status_code=StatusCodes.UNAVAILABLE.value,
+                error_message=f"Worker {worker_id} is not healthy/available",
+            )
 
         # Create protobuf request
         pb_message = worker_messages_pb2.MessageReplicaReceived(
@@ -262,7 +270,9 @@ class WorkersService:
             success=False,
         )
         for attempt in range(policy.max_attempts):
-            result = await self.replicate_to_worker(worker_id, message)
+            result = await self.replicate_to_worker(
+                worker_id=worker_id, message=message
+            )
             replication_status = handle_replication_response_from_workers(
                 results=[result]
             )
@@ -306,7 +316,7 @@ class WorkersService:
                         success=True,
                     )
         raise RequiredCountNotReached(
-            f"Replication: Failed to reach quorum of {replication_count} tasks"
+            f"Replication: Failed to reach required_count of {replication_count} tasks"
         )
 
     def replicate_message_to_remaining_workers(
@@ -377,3 +387,9 @@ class WorkersService:
             f"Received recovery notification for worker {worker_id}: result={result}"
         )
         return result
+
+    def is_quorum_met(self):
+        available_nodes: int = (
+            len(self.heartbeat_service.get_available_workers()) + 1
+        )  # Add master
+        return available_nodes >= self.quorum_quote.value

@@ -4,7 +4,7 @@ A distributed message replication system built with Python and gRPC, featuring a
 
 ## Architecture
 
-- **Master Node**: Coordinates message storage and replication across workers with quorum-based blocking
+- **Master Node**: Coordinates message storage and replication across workers with required count blocking
 - **Worker Nodes**: Secondary replicas that receive, validate, and synchronize messages
 - **gRPC Transport**: Secure communication between master and workers
 - **Message Validation**: Cryptographic signatures ensure message integrity
@@ -19,7 +19,7 @@ A distributed message replication system built with Python and gRPC, featuring a
 ├── master/                    # Master node implementation
 │   ├── domain/               # Master-specific domain models
 │   ├── services/
-│   │   ├── client_state_manager.py # Client blocking when quorum not met
+│   │   ├── client_state_manager.py # Client blocking when write concern was not met
 │   │   ├── heartbeat.py      # Health monitoring with 3-state machine
 │   │   └── replication_coordinator.py # Replication response handling
 │   │   ├── retry_policy.py   # Health-based retry policies
@@ -48,7 +48,7 @@ A distributed message replication system built with Python and gRPC, featuring a
 │   │   ├── in_memory_message_store.py # Message storage with gap handling
 │   │   └── interface.py      # Storage interface
 │   └── utils/
-│       ├── concurrency.py    # Quorum utilities and async helpers
+│       ├── concurrency.py    # Required count utilities and async helpers
 │       └── singleton.py      # Singleton pattern for storage
 ├── tests/                    # Comprehensive test suite
 │   ├── test_blocking_write_concern.py # Write concern w=1, w=2, w=3
@@ -107,21 +107,40 @@ A distributed message replication system built with Python and gRPC, featuring a
 
 ## Core Features
 
-### 1. Write Concerns & Quorum-Based Replication
+### 1. Write Concerns & Replication
 
 - **w=1**: Asynchronous replication - client receives immediate response after master stores the message
 - **w=2**: Client blocks until message is replicated to master + 1 worker
 - **w=3**: Client blocks until message is replicated to master + 2 workers (full quorum)
 - **Non-blocking parallel clients**: Multiple clients can operate in parallel without blocking each other
-- **Quorum enforcement**: If quorum cannot be reached (w>available nodes), master switches to read-only mode
+- **Write Concern enforcement**: If count cannot be reached (w>available nodes), master switches to read-only mode for this client
 
-**Implementation**: `master/services/workers.py:68-174`
+**Quorum-Based Availability Check**: Before accepting any write requests, the master verifies that the system meets the configured quorum level. This prevents writes when insufficient nodes are available to maintain data consistency guarantees:
+
+```python
+if not self.workers_service.is_quorum_met():
+    logger.info("Service temporarily unavailable for writes (quorum lost)")
+    return PostMessageResponse(
+        status=ResponseStatus.ERROR,
+        message="Service temporarily unavailable for writes (quorum lost)",
+        total_messages=len(self.store.get_messages()),
+    )
+```
+
+**Configurable Quorum Levels** (via `QUORUM_LEVEL` environment variable):
+- **1** (ONE): Master only - system accepts writes with just the master node (for testing/development)
+- **2** (MAJORITY): At least 2 nodes (master + 1 worker) must be available
+- **3** (ALL): All nodes (master + 2 workers) must be available for write operations
+
+The quorum check is a system-level availability guard, while write concern (w=1, w=2, w=3) controls per-request replication acknowledgments.
+
+**Implementation**: `master/services/workers.py:68-174`, `master/transport/controller.py:43-49`
 
 ### 2. Smart Retry Mechanism
 
 **Retry Logic**:
-- **Blocking phase**: Master retries failed replications until quorum is reached
-- **Background phase**: Once quorum is achieved, remaining failed workers are retried in background tasks
+- **Blocking phase**: Master retries failed replications until required count is reached
+- **Background phase**: Once count is achieved, remaining failed workers are retried in background tasks
 - **Health-based policies**:
   - **HEALTHY nodes**: 5 quick retry attempts (transient failures)
   - **SUSPECTED nodes**: 15 retry attempts with exponential backoff
@@ -208,7 +227,7 @@ pytest tests/
 1. Start Master + Worker1
 2. Send (Msg1, w=1) → OK (immediate response)
 3. Send (Msg2, w=2) → OK (blocked until Worker1 confirms)
-4. Send (Msg3, w=3) → WAITING (no quorum, only 2 nodes available)
+4. Send (Msg3, w=3) → WAITING (no count, only 2 nodes available)
 5. Send (Msg4, w=1) → OK (immediate response)
 6. Start Worker2 → Recovery triggered
 7. Check Worker2 messages → [Msg1, Msg2, Msg3, Msg4] (all synced in order)
@@ -245,6 +264,8 @@ docker-compose logs -f worker2
 - `AUTH_TOKEN`: Authentication token for gRPC calls
 - `MACHINE_ID`: Unique identifier for worker nodes
 - `FERNET_KEY`: Encryption key for message signing
+- `QUORUM_LEVEL`: Minimum nodes required for system availability (1=ONE, 2=MAJORITY, 3=ALL; default: 1)
+- `REPLICATION_TIMEOUT`: Timeout in seconds for replication operations (default: 5.5)
 
 ### Status Codes
 
@@ -276,11 +297,11 @@ docker-compose logs -f worker1
 
 The retry mechanism uses a two-phase approach:
 
-1. **Blocking Phase**: When quorum is not reached, master blocks the client and retries failed workers until quorum threshold is met
-2. **Background Phase**: Once quorum is achieved, client receives success response while remaining failed workers are retried in background async tasks
+1. **Blocking Phase**: When required write concern count is not reached, master blocks the client and retries failed workers until threshold is met
+2. **Background Phase**: Once write concern is achieved, client receives success response while remaining failed workers are retried in background async tasks
 
 This ensures:
-- ✅ Clients get fast responses once quorum is reached
+- ✅ Clients get fast responses once write concern is reached
 - ✅ Eventual consistency for all workers without blocking clients
 - ✅ Parallel clients never block each other
 - ✅ Strong references to background tasks prevent garbage collection (bounded deque with max 1000 tasks)

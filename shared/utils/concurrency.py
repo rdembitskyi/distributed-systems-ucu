@@ -20,7 +20,7 @@ class CompletionResult:
 
 async def wait_for_required_count(tasks, required_count: int):
     """Wait until required_count tasks complete successfully"""
-    logger.info(f"Replication: Waiting for quorum of {required_count} tasks")
+    logger.info(f"Replication: Waiting for count of {required_count} tasks")
     tasks = [asyncio.create_task(coro) for coro in tasks]
 
     success_tasks = []
@@ -45,6 +45,6 @@ async def wait_for_required_count(tasks, required_count: int):
                 pending_tasks=pending_tasks,
             )
     raise RequiredCountNotReached(
-        message=f"Replication: Failed to reach quorum of {required_count} tasks",
+        message=f"Replication: Failed to reach count of {required_count} tasks",
         completed_results=success_tasks + failure_tasks,
     )

@@ -21,7 +21,8 @@ services:
       WORKER_2_ADDRESS: worker2
       WORKER_1_PORT: 50053
       WORKER_2_PORT: 50054
-      REPLICATION_TIMEOUT: 15.0
+      REPLICATION_TIMEOUT: 5.5
+      QUORUM_LEVEL: 1
     volumes:
       - ./logs:/app/logs
       - ./master:/app/master
@@ -44,7 +45,7 @@ services:
       - grpc-network
     environment:
       <<: *common-env
-      MASTER_ADDRESS: MASTER_ADDRESS
+      MASTER_ADDRESS: master
       MASTER_PORT: 50052
       PORT: 50053
       MACHINE_ID: 1234
@@ -65,6 +66,8 @@ services:
       - grpc-network
     environment:
       <<: *common-env
+      MASTER_ADDRESS: master
+      MASTER_PORT: 50052
       PORT: 50054
       MACHINE_ID: 5678
       TESTING_DELAY: 5
