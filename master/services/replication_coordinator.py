@@ -40,6 +40,9 @@ def handle_replication_response_from_workers(
             logger.warning(
                 f"Replication warning for worker {worker_id}: Rate limited - {result.error_message}"
             )
+        elif result.status_code == StatusCodes.UNAVAILABLE.value:
+            retry_workers.append(worker_id)
+            logger.warning(f"Replication warning for worker {worker_id}: Unavailable - {result.error_message}")
         elif result.status_code == StatusCodes.INTERNAL_SERVER_ERROR.value:
             retry_workers.append(worker_id)
             error_str = f"Replication failed for worker {worker_id}: Internal Server Error - {result.error_message}"
