@@ -32,7 +32,7 @@ class WorkerSyncService:
             SyncResult: Status of sync operation with failed messages if any
         """
         storage = get_messages_storage()
-        worker_latest_message = storage.get_latest()
+        worker_latest_message = storage.get_latest_delivered()
         worker_last_seq = (
             worker_latest_message.sequence_number
             if worker_latest_message

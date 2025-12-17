@@ -36,6 +36,7 @@ class MessageStore(MessageStoreInterface):
 
         # Track latest for O(1) access
         self.latest_message = None
+        self.latest_delivered_message = None
 
     def add_message(self, message: Message, missing_parent: bool) -> bool:
         """Add a message - O(1) operation"""
@@ -78,8 +79,15 @@ class MessageStore(MessageStoreInterface):
         """Get latest message - O(1)"""
         return self.latest_message
 
+    def get_latest_delivered(self):
+        return self.latest_delivered_message
+
+
     def set_latest(self, message: Message):
         self.latest_message = message
+
+        if message.status == MessageStatus.DELIVERED:
+            self.latest_delivered_message = message
 
     def get_by_sequence(self, seq: int) -> Optional[Dict]:
         """Get message by sequence number - O(1)"""
